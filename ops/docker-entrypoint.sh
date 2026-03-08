@@ -3,7 +3,7 @@ set -eu
 
 # Container entrypoint for the application image. It optionally runs Alembic
 # migrations, then launches either the provided command or the default uvicorn
-# server defined for this template.
+# server defined for this chassis.
 cd /app
 
 # Keep the SQLite data directory present for local and volume-backed runs.
