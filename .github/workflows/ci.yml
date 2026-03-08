@@ -1,0 +1,207 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@557e51de59eb14aaaba2ed9621916900a91d50c6 # v6.6.1
+
+      - name: Install dependencies (all extras needed for full test suite)
+        run: uv sync --all-extras
+
+      - name: Audit Python dependencies for known vulnerabilities
+        run: uv run pip-audit --strict --desc
+
+      - name: Run Bandit security linter
+        run: uv run bandit -r src -c pyproject.toml -q
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Run CI quality gate
+        run: make ci
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: coverage-report
+          path: coverage.xml
+
+  docker-build:
+    needs: quality
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Capture build metadata
+        id: meta
+        run: |
+          echo "created=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Build Docker image smoke test
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          context: .
+          file: Dockerfile
+          push: false
+          load: true
+          tags: fastapi-template:ci
+          cache-from: type=gha,scope=fastapi-template-ci
+          cache-to: type=gha,mode=max,scope=fastapi-template-ci
+          build-args: |
+            BUILD_DATE=${{ steps.meta.outputs.created }}
+            REPOSITORY_URL=https://github.com/${{ github.repository }}
+            VCS_REF=${{ github.sha }}
+            VERSION=ci-${{ github.sha }}
+
+      - name: Report Docker image size
+        run: |
+          size_bytes="$(docker image inspect fastapi-template:ci --format '{{.Size}}')"
+          size_mib="$(SIZE_BYTES="${size_bytes}" python - <<'PY'
+          import os
+          print(f"{int(os.environ['SIZE_BYTES']) / 1024 / 1024:.1f} MiB")
+          PY
+          )"
+          {
+            echo "## Docker image benchmark"
+            echo
+            echo "- Tag: \`fastapi-template:ci\`"
+            echo "- Uncompressed size: ${size_mib}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Smoke test built container runtime
+        run: |
+          container_name="fastapi-template-ci-smoke"
+          trap 'docker rm -f "${container_name}" >/dev/null 2>&1 || true' EXIT
+
+          docker run -d \
+            --name "${container_name}" \
+            -p 18080:8000 \
+            -e APP_HOST=0.0.0.0 \
+            -e APP_PORT=8000 \
+            -e RUN_DB_MIGRATIONS=true \
+            -e UVICORN_WORKERS=1 \
+            fastapi-template:ci
+
+          python - <<'PY'
+          import time
+          import urllib.error
+          import urllib.request
+
+          deadline = time.time() + 90
+          last_error = None
+          while time.time() < deadline:
+              try:
+                  with urllib.request.urlopen("http://127.0.0.1:18080/ready", timeout=2) as response:
+                      if response.status == 200:
+                          raise SystemExit(0)
+              except Exception as exc:  # pragma: no cover - CI smoke script
+                  last_error = exc
+                  time.sleep(2)
+
+          raise SystemExit(f"Container did not become ready: {last_error}")
+          PY
+
+      - name: Scan Docker image for vulnerabilities
+        uses: aquasecurity/trivy-action@18f2510ee396bbf400402947e0f18c8ea63fd18e # v0.28.0
+        with:
+          image-ref: fastapi-template:ci
+          format: table
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+
+  prodlike-stack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: fastapi_template
+          POSTGRES_USER: fastapi
+          POSTGRES_PASSWORD: fastapi
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fastapi -d fastapi_template"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: "3.13"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@557e51de59eb14aaaba2ed9621916900a91d50c6 # v6.6.1
+
+      - name: Install dependencies (with postgres and redis extras)
+        run: uv sync --extra postgres --extra redis
+
+      - name: Run integration tests against Postgres and Redis
+        env:
+          TEST_POSTGRES_URL: postgresql+asyncpg://fastapi:fastapi@127.0.0.1:5432/fastapi_template
+          TEST_POSTGRES_ALEMBIC_URL: postgresql+psycopg://fastapi:fastapi@127.0.0.1:5432/fastapi_template
+          TEST_REDIS_URL: redis://127.0.0.1:6379/0
+        run: uv run pytest tests/integration -m integration
+
+      - name: Run production-like stack verification
+        env:
+          VERIFY_STACK_DATABASE_URL: postgresql+asyncpg://fastapi:fastapi@127.0.0.1:5432/fastapi_template
+          VERIFY_STACK_ALEMBIC_DATABASE_URL: postgresql+psycopg://fastapi:fastapi@127.0.0.1:5432/fastapi_template
+          VERIFY_STACK_REDIS_URL: redis://127.0.0.1:6379/0
+          VERIFY_STACK_AUTH_MODE: jwks
+        run: uv run python ops/test_stack.py

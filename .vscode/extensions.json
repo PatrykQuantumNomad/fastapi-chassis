@@ -1,0 +1,18 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.debugpy",
+    "charliermarsh.ruff",
+    "ryanluker.vscode-coverage-gutters",
+    "streetsidesoftware.code-spell-checker",
+    "davidanson.vscode-markdownlint",
+    "tamasfe.even-better-toml"
+  ],
+  "unwantedRecommendations": [
+    "ms-python.autopep8",
+    "ms-python.black-formatter",
+    "ms-python.flake8",
+    "ms-python.isort"
+  ]
+}

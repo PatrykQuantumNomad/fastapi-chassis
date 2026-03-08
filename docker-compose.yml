@@ -1,0 +1,20 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fastapi-template:local
+    env_file:
+      - "${ENV_FILE:-.env}"
+    environment:
+      APP_HOST: "0.0.0.0"
+      APP_PORT: "8000"
+      APP_DATABASE_BACKEND: "${APP_DATABASE_BACKEND:-sqlite}"
+      APP_DATABASE_SQLITE_PATH: "${APP_DATABASE_SQLITE_PATH:-./data/app.db}"
+      APP_RATE_LIMIT_STORAGE_BACKEND: "${APP_RATE_LIMIT_STORAGE_BACKEND:-memory}"
+      RUN_DB_MIGRATIONS: "${RUN_DB_MIGRATIONS:-true}"
+      UVICORN_WORKERS: "${UVICORN_WORKERS:-1}"
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    volumes:
+      - ./data:/app/data

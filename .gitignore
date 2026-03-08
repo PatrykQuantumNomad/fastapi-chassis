@@ -144,6 +144,10 @@ ENV/
 env.bak/
 venv.bak/
 
+# Local application data
+data/*.db
+data/*.db-*
+
 # Spyder project settings
 .spyderproject
 .spyproject

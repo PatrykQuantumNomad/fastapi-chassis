@@ -1,0 +1,23 @@
+services:
+  redis:
+    image: "${REDIS_IMAGE:-redis:7.4-alpine}"
+    command:
+      [
+        "redis-server",
+        "--appendonly",
+        "${REDIS_APPENDONLY:-yes}",
+        "--save",
+        "${REDIS_SAVE_POLICY:-60 1000}",
+      ]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  redis-data:

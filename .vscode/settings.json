@@ -1,0 +1,176 @@
+{
+  // ============================================================================
+  // General Editor Settings
+  // ============================================================================
+  "editor.rulers": [100],
+  "editor.insertSpaces": true,
+  "editor.tabSize": 2,
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "charliermarsh.ruff",
+
+  // ============================================================================
+  // Python Settings
+  // ============================================================================
+  // Python interpreter configuration
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  // Path containing local virtual environments (for interpreter discovery)
+  "python.venvPath": "${workspaceFolder}",
+
+  // Python file formatting with Ruff
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+
+    // Ruff linter configuration
+    "ruff.organizeImports": true,
+    "ruff.fixAll": true,
+
+    // Python testing configuration
+    "python.testing.pytestArgs": [
+        "tests",
+        "--cov=src/app",
+        "--cov-report=xml:coverage.xml",
+        "--cov-report=term-missing"
+    ],
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "coverage-gutters.coverageFileNames": [
+        "coverage.xml"
+    ],
+
+  // ============================================================================
+  // Markdown file settings
+  // ============================================================================
+  "[markdown]": {
+    "editor.wordWrapColumn": 80,
+    "editor.wordWrap": "wordWrapColumn",
+    "editor.quickSuggestions": {
+      "comments": "off",
+      "strings": "off",
+      "other": "off"
+    },
+    "files.trimTrailingWhitespace": false
+  },
+
+  // ============================================================================
+  // File Management
+  // ============================================================================
+  // File encoding and line endings
+  "files.encoding": "utf8",
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimFinalNewlines": true,
+  "files.trimTrailingWhitespace": true,
+
+  // Files to exclude from file explorer
+  "files.exclude": {
+    "**/__pycache__": true,
+    "**/.mypy_cache/**": true,
+    "**/*.pyc": true,
+    "**/.venv/**": true,
+    "**/.ruff_cache/**": true,
+    "**/.coverage/**": true,
+    "**/.pytest_cache/**": true,
+  },
+
+  // File watcher exclusions to reduce editor CPU usage in large projects
+  "files.watcherExclude": {
+    "**/__pycache__/**": true,
+    "**/*.pyc": true,
+    "**/.pytest_cache/**": true,
+    "**/.mypy_cache/**": true,
+    "**/.ruff_cache/**": true
+  },
+
+  // ============================================================================
+  // Search Settings
+  // ============================================================================
+  // Directories to exclude from search
+  "search.exclude": {
+    "**/.git": true,
+    "**/coverage": true,
+    "**/__pycache__": true,
+    "**/*.pyc": true,
+    "**/.ruff_cache/**": true,
+    "**/.coverage/**": true,
+    "**/.pytest_cache/**": true,
+    "**/.mypy_cache/**": true,
+    "**/.venv/**": true
+  },
+
+  // ============================================================================
+  // Terminal Settings
+  // ============================================================================
+  "terminal.integrated.defaultProfile.osx": "zsh",
+  "terminal.integrated.profiles.osx": {
+    "zsh": {
+      "path": "zsh",
+      "args": ["-l", "-c", "source ${workspaceFolder}/.venv/bin/activate 2>/dev/null || true; exec zsh"]
+    }
+  },
+  "terminal.integrated.shellIntegration.enabled": true,
+
+  // ============================================================================
+  // UI/UX Settings
+  // ============================================================================
+  // Breadcrumbs for better code navigation
+  "breadcrumbs.enabled": true,
+  "breadcrumbs.symbolPath": "on",
+
+  // ============================================================================
+  // Spell Checker Settings
+  // ============================================================================
+  "cSpell.words": [
+    "ASGI",
+    "asyncio",
+    "autoflush",
+    "autogeneration",
+    "autouse",
+    "caplog",
+    "conftest",
+    "cpus",
+    "delenv",
+    "doseq",
+    "fastapi",
+    "geolocation",
+    "healthcheck",
+    "hostnames",
+    "HSTS",
+    "httpx",
+    "Instrumentor",
+    "isort",
+    "levelname",
+    "livez",
+    "monkeypatching",
+    "mypy",
+    "nosniff",
+    "NOTSET",
+    "poolclass",
+    "prodlike",
+    "pycodestyle",
+    "pydantic",
+    "pyflakes",
+    "pyproject",
+    "pytest",
+    "pytestmark",
+    "pythonjsonlogger",
+    "pyupgrade",
+    "qualname",
+    "readyz",
+    "redoc",
+    "referer",
+    "spoofable",
+    "sqlalchemy",
+    "Starlette",
+    "testpaths",
+    "tini",
+    "tmpfs",
+    "uvicorn",
+    "virtualenv"
+  ]
+}

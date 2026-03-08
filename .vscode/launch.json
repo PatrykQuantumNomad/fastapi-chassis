@@ -1,0 +1,66 @@
+{
+  // VS Code / Cursor debug configurations
+  "version": "0.2.0",
+  "configurations": [
+    {
+      // Start app via main.py (uses Settings-driven host/port/debug)
+      "name": "Python: FastAPI (main.py)",
+      "type": "debugpy",
+      "request": "launch",
+      "program": "${workspaceFolder}/main.py",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      // Start uvicorn explicitly (useful when you want fixed CLI args)
+      "name": "Python: Uvicorn (reload)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "uvicorn",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "main:app",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "8000",
+        "--reload"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      // Run all tests with debugger attached
+      "name": "Python: Pytest (all tests)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "tests",
+        "-q"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      // Debug only the currently open test file
+      "name": "Python: Pytest (current file)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "pytest",
+      "cwd": "${workspaceFolder}",
+      "args": [
+        "${file}",
+        "-q"
+      ],
+      "console": "integratedTerminal",
+      "justMyCode": true,
+      "envFile": "${workspaceFolder}/.env"
+    }
+  ]
+}

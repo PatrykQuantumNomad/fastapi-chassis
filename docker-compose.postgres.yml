@@ -1,0 +1,51 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fastapi-template:local
+    env_file:
+      - "${ENV_FILE:-.env}"
+    environment:
+      APP_HOST: "0.0.0.0"
+      APP_PORT: "8000"
+      APP_DATABASE_BACKEND: "${APP_DATABASE_BACKEND:-postgres}"
+      APP_DATABASE_POSTGRES_HOST: "${APP_DATABASE_POSTGRES_HOST:-postgres}"
+      APP_DATABASE_POSTGRES_PORT: "${APP_DATABASE_POSTGRES_PORT:-5432}"
+      APP_DATABASE_POSTGRES_NAME: "${APP_DATABASE_POSTGRES_NAME:-fastapi_template}"
+      APP_DATABASE_POSTGRES_USER: "${APP_DATABASE_POSTGRES_USER:-fastapi}"
+      APP_DATABASE_POSTGRES_PASSWORD: "${APP_DATABASE_POSTGRES_PASSWORD:-fastapi}"
+      APP_RATE_LIMIT_STORAGE_BACKEND: "${APP_RATE_LIMIT_STORAGE_BACKEND:-memory}"
+      APP_REDIS_HOST: "${APP_REDIS_HOST:-redis}"
+      APP_REDIS_PORT: "${APP_REDIS_PORT:-6379}"
+      APP_REDIS_DB: "${APP_REDIS_DB:-0}"
+      RUN_DB_MIGRATIONS: "${RUN_DB_MIGRATIONS:-true}"
+      UVICORN_WORKERS: "${UVICORN_WORKERS:-1}"
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: "${APP_DATABASE_POSTGRES_NAME:-fastapi_template}"
+      POSTGRES_USER: "${APP_DATABASE_POSTGRES_USER:-fastapi}"
+      POSTGRES_PASSWORD: "${APP_DATABASE_POSTGRES_PASSWORD:-fastapi}"
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${APP_DATABASE_POSTGRES_USER:-fastapi} -d ${APP_DATABASE_POSTGRES_NAME:-fastapi_template}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:

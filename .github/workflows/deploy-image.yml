@@ -1,0 +1,109 @@
+name: Deploy Docker Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy"
+        required: true
+        default: latest
+      host_port:
+        description: "Host port to publish"
+        required: true
+        default: "8000"
+      verify_host:
+        description: "Host used for post-deploy verification"
+        required: true
+        default: "127.0.0.1"
+      verify_scheme:
+        description: "Scheme used for post-deploy verification"
+        required: true
+        default: "http"
+      verify_host_header:
+        description: "Optional Host header override for post-deploy verification"
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    env:
+      DEPLOY_HOST: ${{ secrets['DEPLOY_HOST'] }}
+      DEPLOY_USER: ${{ secrets['DEPLOY_USER'] }}
+      DEPLOY_SSH_KEY: ${{ secrets['DEPLOY_SSH_KEY'] }}
+      DEPLOY_PORT: ${{ secrets['DEPLOY_PORT'] }}
+      DEPLOY_PATH: ${{ secrets['DEPLOY_PATH'] }}
+      DEPLOY_ENV_FILE: ${{ secrets['DEPLOY_ENV_FILE'] }}
+      GHCR_USERNAME: ${{ secrets['GHCR_USERNAME'] }}
+      GHCR_TOKEN: ${{ secrets['GHCR_TOKEN'] }}
+      IMAGE_NAME: ghcr.io/${{ github.repository }}
+      IMAGE_TAG: ${{ inputs.image_tag }}
+      HOST_PORT: ${{ inputs.host_port }}
+      VERIFY_HOST: ${{ inputs.verify_host }}
+      VERIFY_SCHEME: ${{ inputs.verify_scheme }}
+      VERIFY_HOST_HEADER: ${{ inputs.verify_host_header }}
+      CONTAINER_NAME: ${{ github.event.repository.name }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Prepare remote deployment directory
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
+        with:
+          host: ${{ env.DEPLOY_HOST }}
+          username: ${{ env.DEPLOY_USER }}
+          key: ${{ env.DEPLOY_SSH_KEY }}
+          port: ${{ env.DEPLOY_PORT || 22 }}
+          script: |
+            mkdir -p "${{ env.DEPLOY_PATH }}/ops"
+            mkdir -p "${{ env.DEPLOY_PATH }}/data"
+
+      - name: Copy deploy script to target host
+        uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634 # v0.1.7
+        with:
+          host: ${{ env.DEPLOY_HOST }}
+          username: ${{ env.DEPLOY_USER }}
+          key: ${{ env.DEPLOY_SSH_KEY }}
+          port: ${{ env.DEPLOY_PORT || 22 }}
+          source: "ops/docker-deploy-image.sh"
+          target: "${{ env.DEPLOY_PATH }}"
+
+      - name: Run remote image deployment
+        uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
+        with:
+          host: ${{ env.DEPLOY_HOST }}
+          username: ${{ env.DEPLOY_USER }}
+          key: ${{ env.DEPLOY_SSH_KEY }}
+          port: ${{ env.DEPLOY_PORT || 22 }}
+          script: |
+            umask 077
+            cat <<'EOF' > "${{ env.DEPLOY_PATH }}/.env"
+            ${{ env.DEPLOY_ENV_FILE }}
+            EOF
+
+            chmod +x "${{ env.DEPLOY_PATH }}/ops/docker-deploy-image.sh"
+
+            export IMAGE_NAME="${{ env.IMAGE_NAME }}"
+            export IMAGE_TAG="${{ env.IMAGE_TAG }}"
+            export HOST_PORT="${{ env.HOST_PORT }}"
+            export VERIFY_HOST="${{ env.VERIFY_HOST }}"
+            export VERIFY_SCHEME="${{ env.VERIFY_SCHEME }}"
+            export VERIFY_HOST_HEADER="${{ env.VERIFY_HOST_HEADER }}"
+            export CONTAINER_NAME="${{ env.CONTAINER_NAME }}"
+            export ENV_FILE="${{ env.DEPLOY_PATH }}/.env"
+            export DATA_DIR="${{ env.DEPLOY_PATH }}/data"
+            export REGISTRY_USERNAME="${{ env.GHCR_USERNAME }}"
+            export REGISTRY_PASSWORD="${{ env.GHCR_TOKEN }}"
+
+            "${{ env.DEPLOY_PATH }}/ops/docker-deploy-image.sh"

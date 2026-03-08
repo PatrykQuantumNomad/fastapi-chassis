@@ -1,0 +1,45 @@
+name: fastapi-template-deploy
+
+services:
+  app:
+    image: "${IMAGE_NAME:-ghcr.io/example/fastapi-template}:${IMAGE_TAG:-latest}"
+    env_file:
+      - "${ENV_FILE:-.env}"
+    environment:
+      APP_HOST: "0.0.0.0"
+      APP_PORT: "8000"
+      RUN_DB_MIGRATIONS: "${RUN_DB_MIGRATIONS:-false}"
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    volumes:
+      - app-data:/app/data
+    tmpfs:
+      - /tmp
+      - /var/tmp
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.00"
+          memory: "512M"
+        reservations:
+          memory: "256M"
+    networks:
+      - app_net
+
+volumes:
+  app-data:
+
+networks:
+  app_net:
+    driver: bridge

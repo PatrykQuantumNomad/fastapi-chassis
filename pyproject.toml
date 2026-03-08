@@ -1,0 +1,173 @@
+[project]
+# Distribution/package name as published to package indexes.
+name = "fastapi-template"
+# Initial semantic version for this template package.
+version = "1.0.0"
+# Short summary shown in package listings and metadata.
+description = "Production-ready FastAPI template with Builder pattern configuration"
+# Primary package author/maintainer.
+authors = [{ name = "Patryk Golabek" }]
+# SPDX-compatible license declaration.
+license = { text = "Apache-2.0" }
+# Long description source file used by packaging tools.
+readme = "README.md"
+# Minimum supported Python version for runtime and tooling.
+requires-python = ">=3.13"
+
+# Runtime dependencies required by the application in production.
+dependencies = [
+    # ASGI web framework used for API routing and request handling.
+    "fastapi>=0.135.0",
+    # ASGI server used to run the app (with extras for reload/logging/perf).
+    "uvicorn[standard]>=0.41.0",
+    # Typed settings management from environment variables/.env files.
+    "pydantic-settings>=2.13.0",
+    # Base Prometheus metrics primitives/counters/histograms.
+    "prometheus-client>=0.24.0",
+    # Middleware/exporter integration for FastAPI/Starlette metrics.
+    "starlette-exporter>=0.23.0",
+    # Structured JSON logging formatter for production logs.
+    "python-json-logger>=3.3.0",
+    # Async ORM/core used for database access and model mapping.
+    "sqlalchemy>=2.0.48",
+    # Database migration runner used to evolve schema over time.
+    "alembic>=1.18.4",
+    # Async SQLite driver backing the default local database URL.
+    "aiosqlite>=0.22.1",
+    # JWT parsing/verification used by the auth service.
+    "pyjwt>=2.11.0",
+    # Cryptographic primitives for JWT and key handling.
+    "cryptography>=46.0.5",
+    # Async HTTP client used by integration points and JWKS fetching.
+    "httpx>=0.28.1",
+    # OpenTelemetry tracing API used by instrumentation hooks.
+    "opentelemetry-api>=1.40.0",
+    # OpenTelemetry SDK/provider implementation for exporting spans.
+    "opentelemetry-sdk>=1.40.0",
+    # OTLP/HTTP exporter used to send traces to collectors.
+    "opentelemetry-exporter-otlp-proto-http>=1.40.0",
+    # Automatic request tracing for FastAPI endpoints.
+    "opentelemetry-instrumentation-fastapi>=0.61b0",
+    # Automatic span propagation/tracing for outbound HTTPX calls.
+    "opentelemetry-instrumentation-httpx>=0.61b0",
+    # Automatic SQL span generation for SQLAlchemy engines/sessions.
+    "opentelemetry-instrumentation-sqlalchemy>=0.61b0",
+    # Runtime coroutine bridge used implicitly by SQLAlchemy's async layer.
+    "greenlet>=3.3.2",
+]
+
+# Optional runtime dependencies activated by extras (e.g. `uv sync --extra postgres`).
+[project.optional-dependencies]
+postgres = [
+    # Async Postgres driver used by SQLAlchemy when APP_DATABASE_BACKEND=postgres.
+    "asyncpg>=0.31.0",
+    # Sync Postgres driver used by Alembic for migration execution.
+    "psycopg[binary]>=3.3.3",
+]
+redis = [
+    # Rate-limit storage and caching backend for multi-process or multi-instance deployments.
+    "redis>=7.2.1",
+]
+
+# Development-only dependencies managed by uv dependency groups.
+# These are used for tests, linting, formatting, and static analysis.
+[dependency-groups]
+dev = [
+    # Test runner framework.
+    "pytest>=9.0.0",
+    # Async test support for pytest.
+    "pytest-asyncio>=1.3.0",
+    # Coverage measurement plugin for pytest.
+    "pytest-cov>=7.0.0",
+    # HTTP client used by integration tests.
+    "httpx>=0.28.0",
+    # Linter and formatter.
+    "ruff>=0.15.0",
+    # Static type checker.
+    "mypy>=1.19.0",
+    # Git hook runner for local pre-commit/pre-push checks.
+    "pre-commit>=4.3.0",
+    # Python dependency vulnerability scanner.
+    "pip-audit>=2.7.0",
+    # Python security-oriented static analysis (SAST).
+    "bandit>=1.8.0",
+]
+
+# Build backend definition (PEP 517/518).
+[build-system]
+# Build backend package requirement.
+requires = ["hatchling"]
+# Backend used to build source/wheel distributions.
+build-backend = "hatchling.build"
+
+# Hatch wheel build target configuration.
+[tool.hatch.build.targets.wheel]
+# Package path included in the built wheel.
+packages = ["src/app"]
+
+# Ruff global configuration.
+[tool.ruff]
+# Target syntax/version for linting and formatting rules.
+target-version = "py313"
+# Maximum line length used by formatter/lint checks.
+line-length = 100
+
+# Ruff lint rule selection.
+[tool.ruff.lint]
+# Enabled rule families. Keep this list focused and intentional.
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "SIM", # flake8-simplify
+    "TC",  # flake8-type-checking
+]
+
+# MyPy type-checker configuration.
+[tool.mypy]
+# Python language level assumed during type checking.
+python_version = "3.13"
+# Enable strict mode to maximize type-safety in template code.
+strict = true
+# Warn when inferred Any values leak into returns.
+warn_return_any = true
+# Warn on invalid/unused MyPy config options.
+warn_unused_configs = true
+
+# Pytest configuration.
+[tool.pytest.ini_options]
+# Test discovery roots.
+testpaths = ["tests"]
+# Async handling mode for pytest-asyncio.
+asyncio_mode = "auto"
+# Custom markers used to split quick vs full-stack tests.
+markers = [
+    "unit: fast isolated tests for individual components",
+    "integration: full-stack tests through the ASGI transport",
+]
+
+# Coverage.py runtime collection settings.
+[tool.coverage.run]
+# Measure coverage for application package only.
+source = ["src/app"]
+
+# Coverage.py reporting thresholds/options.
+[tool.coverage.report]
+# Show uncovered line numbers in terminal report.
+show_missing = true
+# Enforce a high coverage floor for this template.
+fail_under = 90
+
+# Coverage.py XML export configuration (CI integrations).
+[tool.coverage.xml]
+# Output path for machine-readable coverage report.
+output = "coverage.xml"
+
+# Bandit security linter configuration.
+[tool.bandit]
+exclude_dirs = ["tests"]
+skips = ["B101"]
