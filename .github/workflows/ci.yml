@@ -36,7 +36,7 @@ jobs:
         run: uv sync --all-extras
 
       - name: Audit Python dependencies for known vulnerabilities
-        run: uv run pip-audit --strict --desc
+        run: uv run pip-audit --strict --desc --skip-editable
 
       - name: Run Bandit security linter
         run: uv run bandit -r src -c pyproject.toml -q
@@ -139,7 +139,7 @@ jobs:
           PY
 
       - name: Scan Docker image for vulnerabilities
-        uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
+        uses: aquasecurity/trivy-action@57a97c7e7821a5776cebc9bb87c984fa69cba8f1 # v0.35.0
         with:
           image-ref: fastapi-template:ci
           format: table
@@ -202,6 +202,6 @@ jobs:
         env:
           VERIFY_STACK_DATABASE_URL: postgresql+asyncpg://fastapi:fastapi@127.0.0.1:5432/fastapi_template
           VERIFY_STACK_ALEMBIC_DATABASE_URL: postgresql+psycopg://fastapi:fastapi@127.0.0.1:5432/fastapi_template
-          VERIFY_STACK_REDIS_URL: redis://127.0.0.1:6379/0
+          VERIFY_STACK_REDIS_URL: redis://127.0.0.1:6379/1
           VERIFY_STACK_AUTH_MODE: jwks
         run: uv run python ops/test_stack.py
