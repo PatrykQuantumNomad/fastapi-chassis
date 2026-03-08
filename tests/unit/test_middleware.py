@@ -10,6 +10,7 @@ Copyright: 2026 Patryk Golabek
 """
 
 import asyncio
+import importlib.util
 import logging
 from collections.abc import AsyncIterator
 from ipaddress import ip_network
@@ -743,6 +744,7 @@ class TestRateLimitHelpers:
         assert len(store._buckets) == 1
 
     @pytest.mark.asyncio
+    @pytest.mark.skipif(not importlib.util.find_spec("redis"), reason="redis package not installed")
     async def test_redis_store_sets_expiry_on_first_hit(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:

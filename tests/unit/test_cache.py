@@ -5,6 +5,7 @@ Author: Patryk Golabek
 Copyright: 2026 Patryk Golabek
 """
 
+import importlib.util
 import sys
 import time
 from unittest.mock import AsyncMock, Mock
@@ -19,6 +20,8 @@ from app.cache.store import (
     create_cache_store,
 )
 from tests.helpers import make_settings
+
+_redis_available = importlib.util.find_spec("redis") is not None
 
 pytestmark = pytest.mark.unit
 
@@ -149,6 +152,7 @@ class TestMemoryCacheStore:
 # ──────────────────────────────────────────────
 
 
+@pytest.mark.skipif(not _redis_available, reason="redis package not installed")
 class TestRedisCacheStore:
     """Tests for the Redis-backed cache store with a mocked client."""
 
@@ -266,6 +270,7 @@ class TestCreateCacheStore:
         assert isinstance(store, MemoryCacheStore)
         assert store.max_entries == 500
 
+    @pytest.mark.skipif(not _redis_available, reason="redis package not installed")
     def test_redis_backend_returns_redis_store(self, monkeypatch: pytest.MonkeyPatch) -> None:
         fake_client = AsyncMock()
         from_url = Mock(return_value=fake_client)

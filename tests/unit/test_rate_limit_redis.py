@@ -5,13 +5,19 @@ management, expiry, and decision semantics without requiring a running Redis
 instance.
 """
 
+import importlib.util
 from unittest.mock import AsyncMock, Mock
 
 import pytest
 
 from app.middleware.rate_limit import RedisRateLimitStore
 
-pytestmark = pytest.mark.unit
+_redis_available = importlib.util.find_spec("redis") is not None
+
+pytestmark = [
+    pytest.mark.unit,
+    pytest.mark.skipif(not _redis_available, reason="redis package not installed"),
+]
 
 
 @pytest.fixture
