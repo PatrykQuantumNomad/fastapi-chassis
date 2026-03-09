@@ -2,8 +2,6 @@ name: Docker Image
 
 on:
   push:
-    branches:
-      - main
     tags:
       - "v*"
   workflow_dispatch:
@@ -78,9 +76,8 @@ jobs:
         with:
           images: ${{ steps.image.outputs.name }}
           tags: |
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=latest,enable=${{ github.ref_type == 'tag' }}
             type=sha,prefix=sha-
-            type=ref,event=branch
             type=ref,event=tag
 
       - name: Build and push Docker image
