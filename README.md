@@ -37,6 +37,7 @@ Additional operator-facing documentation:
 - [`docs/architecture.md`](docs/architecture.md): application structure, request flow, runtime resources, auth, and readiness model
 - [`docs/configuration.md`](docs/configuration.md): complete reference for all `APP_*` environment variables
 - [`docs/operations.md`](docs/operations.md): deployment guidance, production configuration, verification, rollback, and troubleshooting
+- [`docs/helm-chart.md`](docs/helm-chart.md): Kubernetes deployment with the included Helm chart
 - [`docs/monitoring.md`](docs/monitoring.md): Prometheus metrics, alert rules, and `APP_METRICS_PREFIX` adaptation
 - [`docs/security.md`](docs/security.md): authentication, authorization, security headers, proxy trust, and production checklist
 - [`docs/api-usage.md`](docs/api-usage.md): endpoint examples with curl commands, error codes, and JWT token generation
@@ -429,6 +430,26 @@ make check
 make ci
 ```
 
+## Helm Chart (Kubernetes)
+
+The repository includes a production-ready Helm chart in `chart/` for deploying to Kubernetes. The chart automatically selects Deployment (Postgres/custom) or StatefulSet (SQLite) based on the database backend, includes security hardening, and supports optional LiteFS/Litestream replication for SQLite.
+
+```bash
+# Postgres backend (default)
+helm install my-app ./chart \
+  --set image.tag=1.0.0 \
+  --set database.postgres.host=postgres.default \
+  --set database.postgres.password=changeme
+
+# SQLite backend
+helm install my-app ./chart \
+  --set image.tag=1.0.0 \
+  --set database.backend=sqlite \
+  --set replicaCount=1
+```
+
+The chart includes Ingress, HPA, PDB, NetworkPolicy, ServiceMonitor, migration Jobs, and per-component `existingSecret` support. For the full guide see [`docs/helm-chart.md`](docs/helm-chart.md). For the values reference see [`chart/README.md`](chart/README.md).
+
 ## Project Structure
 
 ```bash
@@ -442,7 +463,9 @@ make ci
 ├── docker-compose.redis.yml  # Optional Redis overlay for local stacks
 ├── docker-compose.deploy.yml # Remote compose deployment using a pushed image
 ├── ops/monitoring/           # Example alerting rules
+├── chart/                    # Helm chart for Kubernetes deployment
 ├── docs/architecture.md      # Application structure and request flow
+├── docs/helm-chart.md        # Helm chart deployment guide
 ├── docs/operations.md        # Deployment and runtime operations guide
 ├── docs/testing.md           # Developer testing guide
 ├── docs/testing-stack.md     # Live stack verification guide
@@ -485,6 +508,8 @@ See [`.env.example`](.env.example) for the complete set. The most important ones
 | `APP_AUTH_ENABLED` | `false` | Enable JWT validation for protected routes |
 | `APP_AUTH_REQUIRE_EXP` | `true` | Require `exp` on validated JWTs |
 | `APP_AUTH_JWKS_URL` | empty | Remote JWKS endpoint for public key discovery |
+| `APP_AUTH_JWKS_MAX_STALE_SECONDS` | `3600` | Max time a stale JWKS cache is accepted after refresh failure (0 = never) |
+| `APP_AUTH_REQUIRE_WARMUP` | `false` | Require JWKS to be reachable at startup; abort if unreachable |
 | `APP_OTEL_ENABLED` | `false` | Enable OpenTelemetry tracing |
 | `APP_METRICS_ENABLED` | `false` | Enable the Prometheus `/metrics` endpoint |
 | `APP_RATE_LIMIT_ENABLED` | `false` | Enable fixed-window request rate limiting |

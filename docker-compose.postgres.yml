@@ -1,3 +1,7 @@
+# LOCAL DEVELOPMENT ONLY — do not use for production deployments.
+# Default credentials below are intentionally weak for local convenience.
+# For production, use docker-compose.deploy.yml or the Helm chart with
+# proper secrets management (existingSecret, external secret operators, etc.).
 services:
   app:
     build:

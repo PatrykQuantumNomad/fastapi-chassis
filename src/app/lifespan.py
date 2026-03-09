@@ -64,11 +64,18 @@ class LifespanManager:
         )
         app.state.auth_service = JWTAuthService(self.settings, app.state.http_client)
         # Warm the auth service during startup so readiness reflects any remote
-        # JWKS dependencies before traffic begins. If warm-up fails, keep the
-        # process alive and let readiness report the degraded dependency.
+        # JWKS dependencies before traffic begins.  When auth_require_warmup is
+        # true, a failed warm-up terminates the process so traffic never arrives
+        # at an instance that cannot validate tokens.
         try:
             await app.state.auth_service.warm_up()
         except Exception as exc:
+            if self.settings.auth_require_warmup:
+                self.logger.error(
+                    "Auth warm-up failed and APP_AUTH_REQUIRE_WARMUP=true; aborting startup: %s",
+                    exc,
+                )
+                raise
             self.logger.warning(
                 "Auth warm-up failed during startup; continuing with degraded readiness: %s",
                 exc,

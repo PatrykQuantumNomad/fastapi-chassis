@@ -81,6 +81,8 @@ Use `.env.sqlite.example`, `.env.sqlite-redis.example`, or `.env.postgres-redis.
 | `APP_AUTH_REQUIRE_ISSUER` | bool | `true` | Require issuer when auth enabled |
 | `APP_AUTH_REQUIRE_AUDIENCE` | bool | `true` | Require audience when auth enabled |
 | `APP_AUTH_JWKS_CACHE_TTL_SECONDS` | int | `300` | JWKS cache TTL (5–86400) |
+| `APP_AUTH_JWKS_MAX_STALE_SECONDS` | int | `3600` | Max time a stale JWKS cache is accepted after refresh failure (0–86400). Set to 0 to never accept stale keys |
+| `APP_AUTH_REQUIRE_WARMUP` | bool | `false` | Require JWKS to be reachable at startup. When true, the app aborts if JWKS cannot be fetched during boot |
 | `APP_AUTH_CLOCK_SKEW_SECONDS` | int | `30` | Allowed clock skew |
 | `APP_AUTH_HTTP_TIMEOUT_SECONDS` | int | `5` | HTTP timeout for JWKS |
 
@@ -88,8 +90,8 @@ Use `.env.sqlite.example`, `.env.sqlite-redis.example`, or `.env.postgres-redis.
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `APP_CORS_ALLOWED_ORIGINS` | list | `["http://localhost:3000", ...]` | Allowed origins |
-| `APP_CORS_ALLOW_CREDENTIALS` | bool | `false` | Allow credentials |
+| `APP_CORS_ALLOWED_ORIGINS` | list | `["http://localhost:3000", ...]` | Allowed origins. Must not contain `"*"` when credentials are enabled |
+| `APP_CORS_ALLOW_CREDENTIALS` | bool | `false` | Allow credentials. Cannot be `true` when origins include `"*"` |
 | `APP_CORS_ALLOWED_METHODS` | list | GET, POST, PUT, PATCH, DELETE, OPTIONS | Allowed methods |
 | `APP_CORS_ALLOWED_HEADERS` | list | Authorization, Content-Type, ... | Allowed headers |
 | `APP_CORS_EXPOSE_HEADERS` | list | X-Request-ID, X-Correlation-ID, ... | Exposed headers |
@@ -127,8 +129,8 @@ Use `.env.sqlite.example`, `.env.sqlite-redis.example`, or `.env.postgres-redis.
 
 | Variable | Type | Default | Description |
 |----------|------|---------|-------------|
-| `APP_HEALTH_CHECK_PATH` | string | `/healthcheck` | Liveness endpoint path |
-| `APP_READINESS_CHECK_PATH` | string | `/ready` | Readiness endpoint path |
+| `APP_HEALTH_CHECK_PATH` | string | `/healthcheck` | Liveness endpoint path (must differ from readiness path) |
+| `APP_READINESS_CHECK_PATH` | string | `/ready` | Readiness endpoint path (must differ from health path) |
 | `APP_READINESS_INCLUDE_DETAILS` | bool | `false` | Expose failure details in readiness |
 | `APP_INFO_ENDPOINT_ENABLED` | bool | `false` | Expose `/info` |
 | `APP_ENDPOINTS_LISTING_ENABLED` | bool | `false` | Expose `/endpoints` |
@@ -140,7 +142,7 @@ Use `.env.sqlite.example`, `.env.sqlite-redis.example`, or `.env.postgres-redis.
 | `APP_RATE_LIMIT_ENABLED` | bool | `false` | Enable rate limiting |
 | `APP_RATE_LIMIT_REQUESTS` | int | `100` | Max requests per window |
 | `APP_RATE_LIMIT_WINDOW_SECONDS` | int | `60` | Window length |
-| `APP_RATE_LIMIT_KEY_STRATEGY` | string | `ip` | Key strategy: `ip` or `authorization` |
+| `APP_RATE_LIMIT_KEY_STRATEGY` | string | `ip` | Key strategy: `ip` or `authorization`. The `authorization` strategy normalizes the Bearer scheme prefix before hashing so casing differences do not produce separate buckets |
 | `APP_RATE_LIMIT_STORAGE_BACKEND` | string | `memory` | Backend: `memory` or `redis` |
 | `APP_RATE_LIMIT_STORAGE_URL` | string | (derived) | Explicit Redis URL |
 | `APP_REDIS_HOST` | string | `redis` | Redis host |

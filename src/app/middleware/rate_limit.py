@@ -175,7 +175,12 @@ def _build_rate_limit_key(
     if key_strategy == "authorization":
         authorization = headers.get("authorization")
         if authorization:
-            digest = hashlib.sha256(authorization.encode("utf-8")).hexdigest()
+            # Normalize: strip the Bearer scheme prefix so casing/whitespace
+            # differences in the scheme do not produce distinct rate-limit keys.
+            token = authorization
+            if authorization.lower().startswith("bearer "):
+                token = authorization[7:].strip()
+            digest = hashlib.sha256(token.encode("utf-8")).hexdigest()
             return f"authorization:{digest}"
 
     client = scope.get("client")

@@ -254,6 +254,22 @@ class Settings(BaseSettings):
         le=86400,
         description="JWKS cache TTL in seconds",
     )
+    auth_jwks_max_stale_seconds: int = Field(
+        default=3600,
+        ge=0,
+        le=86400,
+        description=(
+            "Maximum time in seconds a stale JWKS cache may be used after a refresh failure. "
+            "Set to 0 to never accept stale keys (fail immediately on refresh failure)."
+        ),
+    )
+    auth_require_warmup: bool = Field(
+        default=False,
+        description=(
+            "Require JWKS to be reachable during startup. "
+            "When true, the app fails fast if JWKS cannot be fetched at boot."
+        ),
+    )
     auth_clock_skew_seconds: int = Field(
         default=30,
         ge=0,
@@ -517,6 +533,8 @@ class Settings(BaseSettings):
         _resolve_csp_for_docs(self)
         _validate_auth_settings(self)
         _validate_proxy_settings(self)
+        _validate_cors_credentials(self)
+        _validate_health_paths(self)
         return self
 
 
@@ -738,3 +756,18 @@ def _validate_trusted_proxy_list(
             ip_network(proxy, strict=False)
         except ValueError as exc:
             raise ValueError(f"Invalid trusted proxy network in {setting_name}: {proxy}") from exc
+
+
+def _validate_cors_credentials(settings: Settings) -> None:
+    """Reject CORS configurations that combine credentials with wildcard origins."""
+    if settings.cors_allow_credentials and "*" in settings.cors_allowed_origins:
+        raise ValueError(
+            "APP_CORS_ALLOWED_ORIGINS must not contain '*' when "
+            "APP_CORS_ALLOW_CREDENTIALS=true (browsers ignore such responses)"
+        )
+
+
+def _validate_health_paths(settings: Settings) -> None:
+    """Ensure health and readiness endpoints use distinct paths."""
+    if settings.health_check_path == settings.readiness_check_path:
+        raise ValueError("APP_HEALTH_CHECK_PATH and APP_READINESS_CHECK_PATH must be different")

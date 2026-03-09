@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: "{{ include "fastapi-chassis.fullname" . }}-test-readiness"
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "fastapi-chassis.namespace" . }}
   labels:
     {{- include "fastapi-chassis.labels" . | nindent 4 }}
   annotations:
@@ -25,7 +25,7 @@ spec:
           set -e
           echo "=== Testing readiness endpoint ==="
           BODY=$(wget -q -O- --timeout=10 \
-            "http://{{ include "fastapi-chassis.fullname" . }}.{{ .Release.Namespace }}.svc.cluster.local:{{ .Values.service.port | default 80 }}{{ .Values.app.readinessCheckPath | default "/ready" }}")
+            "http://{{ include "fastapi-chassis.fullname" . }}.{{ include "fastapi-chassis.namespace" . }}.svc.cluster.local:{{ .Values.service.port | default 80 }}{{ .Values.app.readinessCheckPath | default "/ready" }}")
           echo "$BODY"
           echo ""
           # Verify the response contains "healthy" status

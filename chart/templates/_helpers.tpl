@@ -24,6 +24,13 @@ If release name contains chart name it will be used as a full name.
 {{- end }}
 
 {{/*
+Allow the release namespace to be overridden (Bitnami pattern #9).
+*/}}
+{{- define "fastapi-chassis.namespace" -}}
+{{- default .Release.Namespace .Values.namespaceOverride | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
 Create chart name and version as used by the chart label.
 */}}
 {{- define "fastapi-chassis.chart" -}}
@@ -116,6 +123,289 @@ Headless service name for StatefulSet.
 {{- printf "%s-headless" (include "fastapi-chassis.fullname" .) }}
 {{- end }}
 
+{{/* =======================================================================
+   Bitnami-inspired helpers
+   ======================================================================= */}}
+
+{{/*
+Return the proper container image name (Bitnami pattern #1).
+Supports global registry override, per-image registry, digest pinning,
+and falls back to the chart appVersion for the tag.
+
+Usage:
+  {{ include "fastapi-chassis.image" (dict "imageRoot" .Values.image "global" (.Values.global | default dict) "defaultTag" .Chart.AppVersion) }}
+*/}}
+{{- define "fastapi-chassis.image" -}}
+{{- $registry := .imageRoot.registry | default "" -}}
+{{- if .global -}}
+  {{- if .global.imageRegistry -}}
+    {{- $registry = .global.imageRegistry -}}
+  {{- end -}}
+{{- end -}}
+{{- $repository := .imageRoot.repository -}}
+{{- $digest := .imageRoot.digest | default "" -}}
+{{- if $digest -}}
+  {{- if $registry -}}
+    {{- printf "%s/%s@%s" $registry $repository $digest -}}
+  {{- else -}}
+    {{- printf "%s@%s" $repository $digest -}}
+  {{- end -}}
+{{- else -}}
+  {{- $tag := .imageRoot.tag | default .defaultTag | default "latest" -}}
+  {{- if $registry -}}
+    {{- printf "%s/%s:%s" $registry $repository ($tag | toString) -}}
+  {{- else -}}
+    {{- printf "%s:%s" $repository ($tag | toString) -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the proper imagePullSecrets, merging global and local values (Bitnami pattern #4).
+Supports both map format ({name: secret}) and string format (just the name).
+
+Usage:
+  {{- include "fastapi-chassis.imagePullSecrets" . | nindent 6 }}
+*/}}
+{{- define "fastapi-chassis.imagePullSecrets" -}}
+{{- $pullSecrets := list -}}
+{{- if .Values.global -}}
+  {{- range .Values.global.imagePullSecrets -}}
+    {{- if kindIs "map" . -}}
+      {{- $pullSecrets = append $pullSecrets . -}}
+    {{- else -}}
+      {{- $pullSecrets = append $pullSecrets (dict "name" .) -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- range .Values.imagePullSecrets -}}
+  {{- if kindIs "map" . -}}
+    {{- $pullSecrets = append $pullSecrets . -}}
+  {{- else -}}
+    {{- $pullSecrets = append $pullSecrets (dict "name" .) -}}
+  {{- end -}}
+{{- end -}}
+{{- if $pullSecrets }}
+imagePullSecrets:
+  {{- toYaml $pullSecrets | nindent 2 }}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Render a value that may contain Helm template expressions (Bitnami pattern #5).
+If the value contains {{ it is rendered through tpl, otherwise passed through.
+
+Usage:
+  {{ include "fastapi-chassis.tplvalues.render" (dict "value" .Values.someValue "context" $) }}
+*/}}
+{{- define "fastapi-chassis.tplvalues.render" -}}
+{{- if typeIs "string" .value -}}
+  {{- if contains "{{" .value -}}
+    {{- tpl .value .context -}}
+  {{- else -}}
+    {{- .value -}}
+  {{- end -}}
+{{- else -}}
+  {{- tpl (.value | toYaml) .context -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the target Kubernetes version, allowing override via values (Bitnami pattern #7).
+
+Usage:
+  {{ include "fastapi-chassis.capabilities.kubeVersion" . }}
+*/}}
+{{- define "fastapi-chassis.capabilities.kubeVersion" -}}
+{{- default .Capabilities.KubeVersion.Version .Values.kubeVersionOverride -}}
+{{- end -}}
+
+{{/*
+Return the appropriate apiVersion for Ingress.
+*/}}
+{{- define "fastapi-chassis.capabilities.ingress.apiVersion" -}}
+{{- if semverCompare ">=1.19-0" (include "fastapi-chassis.capabilities.kubeVersion" .) -}}
+networking.k8s.io/v1
+{{- else if semverCompare ">=1.14-0" (include "fastapi-chassis.capabilities.kubeVersion" .) -}}
+networking.k8s.io/v1beta1
+{{- else -}}
+extensions/v1beta1
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the appropriate apiVersion for HPA.
+*/}}
+{{- define "fastapi-chassis.capabilities.hpa.apiVersion" -}}
+{{- if semverCompare ">=1.23-0" (include "fastapi-chassis.capabilities.kubeVersion" .) -}}
+autoscaling/v2
+{{- else -}}
+autoscaling/v2beta2
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the appropriate apiVersion for PDB.
+*/}}
+{{- define "fastapi-chassis.capabilities.pdb.apiVersion" -}}
+{{- if semverCompare ">=1.21-0" (include "fastapi-chassis.capabilities.kubeVersion" .) -}}
+policy/v1
+{{- else -}}
+policy/v1beta1
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return the appropriate apiVersion for CronJob.
+*/}}
+{{- define "fastapi-chassis.capabilities.cronjob.apiVersion" -}}
+{{- if semverCompare ">=1.21-0" (include "fastapi-chassis.capabilities.kubeVersion" .) -}}
+batch/v1
+{{- else -}}
+batch/v1beta1
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return resource requests/limits, resolving preset vs explicit values (Bitnami pattern #8).
+Explicit resources take precedence over presets.
+
+Usage:
+  {{- include "fastapi-chassis.resources" (dict "resources" .Values.resources "resourcePreset" (.Values.resourcePreset | default "")) | nindent 8 }}
+*/}}
+{{- define "fastapi-chassis.resources" -}}
+{{- if .resources -}}
+  {{- toYaml .resources -}}
+{{- else if .resourcePreset -}}
+  {{- include "fastapi-chassis.resources.preset" (dict "preset" .resourcePreset) -}}
+{{- else -}}
+{}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return predefined resource requests/limits for a given preset size.
+These are intended for development/testing only — set explicit resources for production.
+
+Presets: nano, micro, small, medium, large, xlarge, 2xlarge
+*/}}
+{{- define "fastapi-chassis.resources.preset" -}}
+{{- if eq .preset "nano" -}}
+requests:
+  cpu: 50m
+  memory: 64Mi
+  ephemeral-storage: 50Mi
+limits:
+  memory: 128Mi
+  ephemeral-storage: 1Gi
+{{- else if eq .preset "micro" -}}
+requests:
+  cpu: 100m
+  memory: 128Mi
+  ephemeral-storage: 50Mi
+limits:
+  memory: 256Mi
+  ephemeral-storage: 1Gi
+{{- else if eq .preset "small" -}}
+requests:
+  cpu: 100m
+  memory: 256Mi
+  ephemeral-storage: 50Mi
+limits:
+  memory: 512Mi
+  ephemeral-storage: 2Gi
+{{- else if eq .preset "medium" -}}
+requests:
+  cpu: 250m
+  memory: 512Mi
+  ephemeral-storage: 50Mi
+limits:
+  memory: 1Gi
+  ephemeral-storage: 2Gi
+{{- else if eq .preset "large" -}}
+requests:
+  cpu: 500m
+  memory: 1Gi
+  ephemeral-storage: 50Mi
+limits:
+  memory: 2Gi
+  ephemeral-storage: 4Gi
+{{- else if eq .preset "xlarge" -}}
+requests:
+  cpu: 1000m
+  memory: 2Gi
+  ephemeral-storage: 50Mi
+limits:
+  memory: 4Gi
+  ephemeral-storage: 8Gi
+{{- else if eq .preset "2xlarge" -}}
+requests:
+  cpu: 2000m
+  memory: 4Gi
+  ephemeral-storage: 50Mi
+limits:
+  memory: 8Gi
+  ephemeral-storage: 16Gi
+{{- else -}}
+{{- fail (printf "Invalid resource preset: %s. Valid values: nano, micro, small, medium, large, xlarge, 2xlarge" .preset) -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Return affinity rules (Bitnami pattern #10).
+If explicit affinity is set (non-empty map), use it.
+Otherwise, generate pod anti-affinity from podAntiAffinityType (soft/hard).
+
+Usage:
+  {{- include "fastapi-chassis.affinity" . | nindent 4 }}
+*/}}
+{{- define "fastapi-chassis.affinity" -}}
+{{- if gt (len (.Values.affinity | default dict)) 0 -}}
+  {{- toYaml .Values.affinity -}}
+{{- else if .Values.podAntiAffinityType -}}
+  {{- if eq .Values.podAntiAffinityType "soft" }}
+podAntiAffinity:
+  preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchLabels:
+            {{- include "fastapi-chassis.selectorLabels" . | nindent 12 }}
+        topologyKey: kubernetes.io/hostname
+  {{- else if eq .Values.podAntiAffinityType "hard" }}
+podAntiAffinity:
+  requiredDuringSchedulingIgnoredDuringExecution:
+    - labelSelector:
+        matchLabels:
+          {{- include "fastapi-chassis.selectorLabels" . | nindent 10 }}
+      topologyKey: kubernetes.io/hostname
+  {{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Resolve storage class from global and persistence-specific settings (Bitnami pattern #4).
+Supports "-" to explicitly use the default storage class.
+
+Usage:
+  {{- include "fastapi-chassis.storage.class" (dict "persistence" .Values.persistence "global" (.Values.global | default dict)) }}
+*/}}
+{{- define "fastapi-chassis.storage.class" -}}
+{{- $storageClass := .persistence.storageClass | default "" -}}
+{{- if .global -}}
+  {{- if .global.storageClass -}}
+    {{- $storageClass = .global.storageClass -}}
+  {{- end -}}
+{{- end -}}
+{{- if $storageClass -}}
+  {{- if eq $storageClass "-" }}
+storageClassName: ""
+  {{- else }}
+storageClassName: {{ $storageClass | quote }}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
+
 {{/*
 Pod template spec shared between Deployment and StatefulSet.
 Takes a dict with keys: root (the top-level context) and isSqlite (bool string).
@@ -123,6 +413,7 @@ Takes a dict with keys: root (the top-level context) and isSqlite (bool string).
 {{- define "fastapi-chassis.podSpec" -}}
 {{- $isLitefs := and (eq .isSqlite "true") .root.Values.litefs.enabled -}}
 {{- $isLitestream := and (eq .isSqlite "true") .root.Values.litestream.enabled -}}
+{{- $global := .root.Values.global | default dict -}}
 metadata:
   annotations:
     checksum/config: {{ include (print $.root.Template.BasePath "/configmap.yaml") .root | sha256sum }}
@@ -138,10 +429,7 @@ metadata:
     {{- toYaml . | nindent 4 }}
     {{- end }}
 spec:
-  {{- with .root.Values.imagePullSecrets }}
-  imagePullSecrets:
-    {{- toYaml . | nindent 4 }}
-  {{- end }}
+  {{- include "fastapi-chassis.imagePullSecrets" .root | nindent 2 }}
   serviceAccountName: {{ include "fastapi-chassis.serviceAccountName" .root }}
   automountServiceAccountToken: false
   securityContext:
@@ -162,7 +450,7 @@ spec:
   initContainers:
     {{- if $isLitefs }}
     - name: litefs-init
-      image: "{{ .root.Values.litefs.image.repository }}:{{ .root.Values.litefs.image.tag }}"
+      image: {{ include "fastapi-chassis.image" (dict "imageRoot" .root.Values.litefs.image "global" $global "defaultTag" "") }}
       command: ["cp", "/usr/local/bin/litefs", "/litefs-bin/litefs"]
       securityContext:
         allowPrivilegeEscalation: false
@@ -182,7 +470,7 @@ spec:
     {{- end }}
     {{- if $isLitestream }}
     - name: litestream-restore
-      image: "{{ .root.Values.litestream.image.repository }}:{{ .root.Values.litestream.image.tag }}"
+      image: {{ include "fastapi-chassis.image" (dict "imageRoot" .root.Values.litestream.image "global" $global "defaultTag" "") }}
       args: ["restore", "-if-db-not-exists", "-if-replica-exists", "-o", "/app/data/app.db", "{{ .root.Values.litestream.replica.url }}"]
       {{- if .root.Values.litestream.existingSecret }}
       envFrom:
@@ -212,7 +500,7 @@ spec:
   {{- end }}
   containers:
     - name: {{ .root.Chart.Name }}
-      image: "{{ .root.Values.image.repository }}:{{ .root.Values.image.tag | default .root.Chart.AppVersion }}"
+      image: {{ include "fastapi-chassis.image" (dict "imageRoot" .root.Values.image "global" $global "defaultTag" .root.Chart.AppVersion) }}
       imagePullPolicy: {{ .root.Values.image.pullPolicy }}
       {{- if $isLitefs }}
       command: ["/litefs-bin/litefs", "mount"]
@@ -240,6 +528,51 @@ spec:
         {{- with .root.Values.extraEnvFrom }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
+      {{- $hasExistingSecretEnv := or (and (eq (.root.Values.database.backend | default "postgres") "postgres") .root.Values.database.postgres.existingSecret) (and (eq (.root.Values.database.backend | default "postgres") "custom") .root.Values.database.existingSecret) .root.Values.redis.existingSecret (and .root.Values.auth.enabled .root.Values.auth.existingSecret) -}}
+      {{- if $hasExistingSecretEnv }}
+      env:
+        {{- if and (eq (.root.Values.database.backend | default "postgres") "postgres") .root.Values.database.postgres.existingSecret }}
+        - name: APP_DATABASE_POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .root.Values.database.postgres.existingSecret }}
+              key: {{ .root.Values.database.postgres.existingSecretPasswordKey | default "APP_DATABASE_POSTGRES_PASSWORD" }}
+        {{- end }}
+        {{- if and (eq (.root.Values.database.backend | default "postgres") "custom") .root.Values.database.existingSecret }}
+        - name: APP_DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ .root.Values.database.existingSecret }}
+              key: {{ .root.Values.database.existingSecretUrlKey | default "APP_DATABASE_URL" }}
+        - name: APP_ALEMBIC_DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ .root.Values.database.existingSecret }}
+              key: {{ .root.Values.database.existingSecretAlembicUrlKey | default "APP_ALEMBIC_DATABASE_URL" }}
+              optional: true
+        {{- end }}
+        {{- if .root.Values.redis.existingSecret }}
+        - name: APP_REDIS_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ .root.Values.redis.existingSecret }}
+              key: {{ .root.Values.redis.existingSecretPasswordKey | default "APP_REDIS_PASSWORD" }}
+        {{- end }}
+        {{- if and .root.Values.auth.enabled .root.Values.auth.existingSecret }}
+        - name: APP_AUTH_JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: {{ .root.Values.auth.existingSecret }}
+              key: {{ .root.Values.auth.existingSecretJwtSecretKey | default "APP_AUTH_JWT_SECRET" }}
+              optional: true
+        - name: APP_AUTH_JWT_PUBLIC_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ .root.Values.auth.existingSecret }}
+              key: {{ .root.Values.auth.existingSecretJwtPublicKeyKey | default "APP_AUTH_JWT_PUBLIC_KEY" }}
+              optional: true
+        {{- end }}
+      {{- end }}
       livenessProbe:
         httpGet:
           path: {{ .root.Values.app.healthCheckPath | default "/healthcheck" }}
@@ -268,7 +601,7 @@ spec:
         failureThreshold: {{ .root.Values.probes.startup.failureThreshold | default 12 }}
         successThreshold: 1
       resources:
-        {{- toYaml .root.Values.resources | nindent 8 }}
+        {{- include "fastapi-chassis.resources" (dict "resources" .root.Values.resources "resourcePreset" (.root.Values.resourcePreset | default "")) | nindent 8 }}
       securityContext:
         allowPrivilegeEscalation: false
         readOnlyRootFilesystem: true
@@ -305,7 +638,7 @@ spec:
         {{- end }}
     {{- if $isLitestream }}
     - name: litestream
-      image: "{{ .root.Values.litestream.image.repository }}:{{ .root.Values.litestream.image.tag }}"
+      image: {{ include "fastapi-chassis.image" (dict "imageRoot" .root.Values.litestream.image "global" $global "defaultTag" "") }}
       args: ["replicate"]
       {{- if .root.Values.litestream.existingSecret }}
       envFrom:
@@ -364,9 +697,10 @@ spec:
   nodeSelector:
     {{- toYaml . | nindent 4 }}
   {{- end }}
-  {{- with .root.Values.affinity }}
+  {{- $affinity := include "fastapi-chassis.affinity" .root -}}
+  {{- if $affinity }}
   affinity:
-    {{- toYaml . | nindent 4 }}
+    {{- $affinity | nindent 4 }}
   {{- end }}
   {{- with .root.Values.tolerations }}
   tolerations:

@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: {{ include "fastapi-chassis.fullname" . }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "fastapi-chassis.namespace" . }}
   labels:
     {{- include "fastapi-chassis.labels" . | nindent 4 }}
   {{- with .Values.service.annotations }}

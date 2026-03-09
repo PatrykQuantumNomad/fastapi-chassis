@@ -475,6 +475,63 @@ class TestCacheSettings:
             make_settings(cache_backend="memcached", metrics_enabled=False)
 
 
+class TestCORSCredentialsValidation:
+    """CORS credentials must not be combined with wildcard origins."""
+
+    def test_cors_credentials_with_wildcard_origin_is_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="APP_CORS_ALLOWED_ORIGINS"):
+            make_settings(
+                cors_allow_credentials=True,
+                cors_allowed_origins=["*"],
+                metrics_enabled=False,
+            )
+
+    def test_cors_credentials_with_wildcard_among_origins_is_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="APP_CORS_ALLOWED_ORIGINS"):
+            make_settings(
+                cors_allow_credentials=True,
+                cors_allowed_origins=["https://example.com", "*"],
+                metrics_enabled=False,
+            )
+
+    def test_cors_credentials_with_explicit_origins_is_accepted(self) -> None:
+        s = make_settings(
+            cors_allow_credentials=True,
+            cors_allowed_origins=["https://example.com"],
+            metrics_enabled=False,
+        )
+        assert s.cors_allow_credentials is True
+
+    def test_cors_wildcard_without_credentials_is_accepted(self) -> None:
+        s = make_settings(
+            cors_allow_credentials=False,
+            cors_allowed_origins=["*"],
+            metrics_enabled=False,
+        )
+        assert s.cors_allowed_origins == ["*"]
+
+
+class TestHealthPathValidation:
+    """Health and readiness paths must be distinct."""
+
+    def test_same_health_and_readiness_path_is_rejected(self) -> None:
+        with pytest.raises(ValidationError, match="must be different"):
+            make_settings(
+                health_check_path="/health",
+                readiness_check_path="/health",
+                metrics_enabled=False,
+            )
+
+    def test_different_health_and_readiness_paths_accepted(self) -> None:
+        s = make_settings(
+            health_check_path="/healthcheck",
+            readiness_check_path="/ready",
+            metrics_enabled=False,
+        )
+        assert s.health_check_path == "/healthcheck"
+        assert s.readiness_check_path == "/ready"
+
+
 class TestJWTAlgorithmFamilyHelper:
     """Tests for the _jwt_algorithm_family helper."""
 

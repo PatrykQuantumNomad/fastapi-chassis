@@ -60,8 +60,20 @@ When using a JWKS endpoint:
 - Keys are cached for `APP_AUTH_JWKS_CACHE_TTL_SECONDS` (default 300s).
 - On token `kid` miss, the service forces one cache refresh before rejecting.
 - If refresh fails but a prior cache exists, the stale cache is used for
-  already-known keys. Readiness reports this degraded state.
+  already-known keys **up to `APP_AUTH_JWKS_MAX_STALE_SECONDS`** (default 3600s).
+  After that window expires, the stale cache is discarded and requests that
+  require JWKS validation will fail until the endpoint recovers. Set this to
+  `0` to never accept stale keys (fail immediately on any refresh failure).
+  Readiness reports the degraded state while stale keys are in use.
 - Brand new keys (not in the stale cache) require a successful refresh.
+
+### Startup Warmup
+
+When `APP_AUTH_REQUIRE_WARMUP=true`, the application aborts startup if the
+JWKS endpoint is unreachable during the initial warm-up. This prevents an
+instance from accepting traffic when it cannot validate tokens. The default
+(`false`) keeps the existing behavior: the app starts with degraded readiness
+and retries on the next request or readiness check.
 
 ### Secret Rotation
 
@@ -214,6 +226,11 @@ fixed-window algorithm:
 
 Health, readiness, metrics, and favicon paths are exempt from rate limiting.
 
+The `authorization` key strategy normalizes Bearer tokens before hashing:
+the `Bearer ` scheme prefix is stripped and whitespace is trimmed so that
+casing differences (e.g. `Bearer`, `bearer`, `BEARER`) produce the same
+rate-limit bucket.
+
 Rate-limited responses include `X-RateLimit-Limit`, `X-RateLimit-Remaining`,
 `X-RateLimit-Reset`, and `Retry-After` headers.
 
@@ -223,6 +240,8 @@ Rate-limited responses include `X-RateLimit-Limit`, `X-RateLimit-Remaining`,
 - **Request timeout**: `APP_REQUEST_TIMEOUT` (default 30s, max 300s).
 - **Trusted hosts**: `APP_TRUSTED_HOSTS` validates `Host` headers.
 - **CORS**: explicit origin allowlists via `APP_CORS_ALLOWED_ORIGINS`.
+  Wildcard (`"*"`) origins cannot be combined with
+  `APP_CORS_ALLOW_CREDENTIALS=true`; the settings layer rejects this at startup.
 
 ## Error Handling
 
@@ -262,6 +281,8 @@ Before deploying to production:
 
 - [ ] Set `APP_AUTH_ENABLED=true` with JWKS or static public key
 - [ ] Set `APP_AUTH_JWT_ISSUER` and `APP_AUTH_JWT_AUDIENCE`
+- [ ] Consider `APP_AUTH_REQUIRE_WARMUP=true` to fail fast on JWKS issues
+- [ ] Review `APP_AUTH_JWKS_MAX_STALE_SECONDS` for your availability/security trade-off
 - [ ] Set `APP_TRUSTED_HOSTS` to your public hostnames
 - [ ] Set `APP_CORS_ALLOWED_ORIGINS` to your frontend origins
 - [ ] Enable HSTS if behind HTTPS (`APP_SECURITY_HSTS_ENABLED=true`)

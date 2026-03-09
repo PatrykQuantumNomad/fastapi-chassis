@@ -1,1 +1,0 @@
-{{/* PVC is not rendered for SQLite — the StatefulSet uses volumeClaimTemplates instead. */}}

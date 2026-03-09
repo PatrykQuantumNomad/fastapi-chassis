@@ -3,7 +3,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: {{ include "fastapi-chassis.fullname" . }}-migrate
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "fastapi-chassis.namespace" . }}
   labels:
     {{- include "fastapi-chassis.labels" . | nindent 4 }}
   annotations:
@@ -18,10 +18,7 @@ spec:
       labels:
         {{- include "fastapi-chassis.selectorLabels" . | nindent 8 }}
     spec:
-      {{- with .Values.imagePullSecrets }}
-      imagePullSecrets:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
+      {{- include "fastapi-chassis.imagePullSecrets" . | nindent 6 }}
       serviceAccountName: {{ include "fastapi-chassis.serviceAccountName" . }}
       restartPolicy: Never
       securityContext:
@@ -33,7 +30,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: migrate
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          image: {{ include "fastapi-chassis.image" (dict "imageRoot" .Values.image "global" (.Values.global | default dict) "defaultTag" .Chart.AppVersion) }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           command: ["alembic", "upgrade", "head"]
           envFrom:
@@ -47,6 +44,28 @@ spec:
             - secretRef:
                 name: {{ .Values.existingSecret }}
             {{- end }}
+          {{- if and (eq (.Values.database.backend | default "postgres") "postgres") .Values.database.postgres.existingSecret }}
+          env:
+            - name: APP_DATABASE_POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.postgres.existingSecret }}
+                  key: {{ .Values.database.postgres.existingSecretPasswordKey | default "APP_DATABASE_POSTGRES_PASSWORD" }}
+          {{- end }}
+          {{- if and (eq (.Values.database.backend | default "postgres") "custom") .Values.database.existingSecret }}
+          env:
+            - name: APP_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.existingSecret }}
+                  key: {{ .Values.database.existingSecretUrlKey | default "APP_DATABASE_URL" }}
+            - name: APP_ALEMBIC_DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.existingSecret }}
+                  key: {{ .Values.database.existingSecretAlembicUrlKey | default "APP_ALEMBIC_DATABASE_URL" }}
+                  optional: true
+          {{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true

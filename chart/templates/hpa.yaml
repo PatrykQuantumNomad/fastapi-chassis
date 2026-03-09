@@ -1,9 +1,9 @@
 {{- if .Values.autoscaling.enabled -}}
-apiVersion: autoscaling/v2
+apiVersion: {{ include "fastapi-chassis.capabilities.hpa.apiVersion" . }}
 kind: HorizontalPodAutoscaler
 metadata:
   name: {{ include "fastapi-chassis.fullname" . }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "fastapi-chassis.namespace" . }}
   labels:
     {{- include "fastapi-chassis.labels" . | nindent 4 }}
 spec:

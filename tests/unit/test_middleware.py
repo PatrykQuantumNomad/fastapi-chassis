@@ -779,6 +779,33 @@ class TestRateLimitHelpers:
 
         assert key.startswith("authorization:")
 
+    def test_build_rate_limit_key_normalizes_bearer_scheme(self) -> None:
+        """Different Bearer casing/spacing produces the same rate-limit key."""
+
+        def _key_for(header_value: bytes) -> str:
+            scope: Scope = {
+                "type": "http",
+                "headers": [(b"authorization", header_value)],
+                "client": ("127.0.0.1", 1234),
+            }
+            return _build_rate_limit_key(
+                scope,
+                "authorization",
+                trust_proxy_headers=False,
+                proxy_headers=["x-forwarded-for"],
+                trusted_proxies=(),
+            )
+
+        key_lower = _key_for(b"bearer my-token")
+        key_upper = _key_for(b"Bearer my-token")
+        key_mixed = _key_for(b"BEARER my-token")
+        key_extra_space = _key_for(b"Bearer  my-token")
+
+        assert key_lower == key_upper
+        assert key_upper == key_mixed
+        # Extra space is stripped, so this also matches
+        assert key_upper == key_extra_space
+
     def test_build_rate_limit_key_falls_back_to_ip_for_unsupported_strategy(self) -> None:
         scope: Scope = {
             "type": "http",

@@ -3,7 +3,7 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: {{ include "fastapi-chassis.fullname" . }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "fastapi-chassis.namespace" . }}
   labels:
     {{- include "fastapi-chassis.labels" . | nindent 4 }}
 spec:

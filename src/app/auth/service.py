@@ -161,8 +161,22 @@ class JWTAuthService:
                 return self._jwks_cache
             except Exception:
                 if self._jwks_cache is not None:
-                    self._jwks_last_fetch_used_stale_cache = True
-                    return self._jwks_cache
+                    stale_seconds = monotonic() - self._jwks_loaded_at
+                    max_stale = self.settings.auth_jwks_max_stale_seconds
+                    if max_stale > 0 and stale_seconds <= max_stale:
+                        self._jwks_last_fetch_used_stale_cache = True
+                        logger.warning(
+                            "JWKS refresh failed; using stale cache (%.0fs old, max %ds)",
+                            stale_seconds,
+                            max_stale,
+                        )
+                        return self._jwks_cache
+                    logger.error(
+                        "JWKS refresh failed and stale cache exceeded max age "
+                        "(%.0fs old, max %ds); rejecting",
+                        stale_seconds,
+                        max_stale,
+                    )
                 raise
 
     def _jwks_cache_expired(self) -> bool:

@@ -1,9 +1,9 @@
 {{- if .Values.podDisruptionBudget.enabled -}}
-apiVersion: policy/v1
+apiVersion: {{ include "fastapi-chassis.capabilities.pdb.apiVersion" . }}
 kind: PodDisruptionBudget
 metadata:
   name: {{ include "fastapi-chassis.fullname" . }}
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "fastapi-chassis.namespace" . }}
   labels:
     {{- include "fastapi-chassis.labels" . | nindent 4 }}
 spec:

@@ -1,5 +1,6 @@
 """Unit tests for stateless JWT authentication and authorization."""
 
+from time import monotonic
 from unittest.mock import AsyncMock, Mock, patch
 
 import httpx
@@ -411,17 +412,58 @@ class TestJWTAuthService:
             auth_jwt_audience="fastapi-chassis",
             auth_jwt_issuer="https://issuer.example.com/",
             auth_jwks_cache_ttl_seconds=5,
+            auth_jwks_max_stale_seconds=3600,
         )
         transport = httpx.MockTransport(lambda request: httpx.Response(status_code=503))
         async with httpx.AsyncClient(transport=transport) as client:
             service = JWTAuthService(settings, client)
             service._jwks_cache = {"keys": [{"kid": "cached-key", "kty": "RSA"}]}
-            service._jwks_loaded_at = 0
+            service._jwks_loaded_at = monotonic() - 60  # stale by 60s, within 3600s limit
 
             jwks = await service._fetch_jwks(force_refresh=False)
 
         assert jwks == {"keys": [{"kid": "cached-key", "kty": "RSA"}]}
         assert service._jwks_last_fetch_used_stale_cache is True
+
+    @pytest.mark.asyncio
+    async def test_fetch_jwks_rejects_stale_cache_beyond_max_stale(self) -> None:
+        settings = make_settings(
+            auth_enabled=True,
+            auth_jwks_url="https://issuer.example.com/.well-known/jwks.json",
+            auth_jwt_algorithms=["RS256"],
+            auth_jwt_audience="fastapi-chassis",
+            auth_jwt_issuer="https://issuer.example.com/",
+            auth_jwks_cache_ttl_seconds=5,
+            auth_jwks_max_stale_seconds=600,
+        )
+        transport = httpx.MockTransport(lambda request: httpx.Response(status_code=503))
+        async with httpx.AsyncClient(transport=transport) as client:
+            service = JWTAuthService(settings, client)
+            service._jwks_cache = {"keys": [{"kid": "cached-key", "kty": "RSA"}]}
+            service._jwks_loaded_at = monotonic() - 700  # stale by 700s, exceeds 600s limit
+
+            with pytest.raises(httpx.HTTPStatusError):
+                await service._fetch_jwks(force_refresh=False)
+
+    @pytest.mark.asyncio
+    async def test_fetch_jwks_rejects_stale_cache_when_max_stale_is_zero(self) -> None:
+        settings = make_settings(
+            auth_enabled=True,
+            auth_jwks_url="https://issuer.example.com/.well-known/jwks.json",
+            auth_jwt_algorithms=["RS256"],
+            auth_jwt_audience="fastapi-chassis",
+            auth_jwt_issuer="https://issuer.example.com/",
+            auth_jwks_cache_ttl_seconds=5,
+            auth_jwks_max_stale_seconds=0,
+        )
+        transport = httpx.MockTransport(lambda request: httpx.Response(status_code=503))
+        async with httpx.AsyncClient(transport=transport) as client:
+            service = JWTAuthService(settings, client)
+            service._jwks_cache = {"keys": [{"kid": "cached-key", "kty": "RSA"}]}
+            service._jwks_loaded_at = monotonic() - 10  # past 5s TTL, triggers refresh
+
+            with pytest.raises(httpx.HTTPStatusError):
+                await service._fetch_jwks(force_refresh=False)
 
     @pytest.mark.asyncio
     async def test_readiness_reports_stale_cache_when_refresh_fails(self) -> None:
@@ -432,12 +474,13 @@ class TestJWTAuthService:
             auth_jwt_audience="fastapi-chassis",
             auth_jwt_issuer="https://issuer.example.com/",
             auth_jwks_cache_ttl_seconds=5,
+            auth_jwks_max_stale_seconds=3600,
         )
         transport = httpx.MockTransport(lambda request: httpx.Response(status_code=503))
         async with httpx.AsyncClient(transport=transport) as client:
             service = JWTAuthService(settings, client)
             service._jwks_cache = {"keys": [{"kid": "cached-key", "kty": "RSA"}]}
-            service._jwks_loaded_at = 0
+            service._jwks_loaded_at = monotonic() - 60
 
             result = await service.readiness_check(FastAPI())
 

@@ -58,6 +58,20 @@ when the host should deploy the published image through `docker compose`.
 The checked-in deployment compose file is intentionally app-only; it does not
 automatically provision Postgres or Redis for production.
 
+### Kubernetes (Helm)
+
+Use the included Helm chart in `chart/` when deploying to Kubernetes:
+
+```bash
+helm install my-app ./chart -f my-values.yaml
+```
+
+The chart handles workload type selection (Deployment vs StatefulSet), ConfigMap
+and Secret generation, Ingress, HPA, PDB, NetworkPolicy, ServiceMonitor, and
+migration Jobs. See [`docs/helm-chart.md`](helm-chart.md) for the full
+deployment guide and [`chart/README.md`](../chart/README.md) for the values
+reference.
+
 ## Runtime Modes
 
 Use one of these four runtime shapes and keep the `.env` values aligned with
@@ -184,7 +198,7 @@ SQLite production pragmas are configured via environment variables and applied
 automatically at engine startup:
 
 | Variable | Default | Effect |
-|----------|---------|--------|
+| --- | --- | --- |
 | `APP_DATABASE_SQLITE_JOURNAL_MODE` | `wal` | WAL enables concurrent readers with a single writer |
 | `APP_DATABASE_SQLITE_SYNCHRONOUS` | `normal` | Safe with WAL; avoids full fsync per commit |
 | `APP_DATABASE_SQLITE_BUSY_TIMEOUT` | `5000` | Milliseconds to wait on a locked database |
@@ -449,7 +463,12 @@ before rolling back code across schema changes.
 - confirm the issuer JWKS endpoint is reachable,
 - confirm the token `kid` exists in the issuer key set,
 - remember that a stale cache only helps for already-known signing keys; brand
-  new keys still require a successful JWKS refresh.
+  new keys still require a successful JWKS refresh,
+- check `APP_AUTH_JWKS_MAX_STALE_SECONDS` (default 3600) — once the stale
+  cache exceeds this age, it is discarded and all JWKS-dependent validation
+  fails until the endpoint recovers. Set to `0` to never accept stale keys,
+- if `APP_AUTH_REQUIRE_WARMUP=true`, the app will not start when JWKS is
+  unreachable at boot; check startup logs for "aborting startup" messages.
 
 ### Rate limiting behaves unexpectedly behind a proxy
 
@@ -520,6 +539,8 @@ If deployed behind a Kubernetes Service or similar orchestrator:
 - Use Redis-backed rate limiting for shared production limits.
 - Restrict proxy-header trust to explicit proxy IPs/CIDRs.
 - Configure auth verification material and validate readiness.
+- Consider `APP_AUTH_REQUIRE_WARMUP=true` to fail fast on JWKS issues at boot.
+- Review `APP_AUTH_JWKS_MAX_STALE_SECONDS` for your availability/security trade-off.
 - Decide whether metrics and diagnostic routes should be exposed.
 - Run `make ci` and `make verify-stack`.
 - Document backup and restore for the chosen database.

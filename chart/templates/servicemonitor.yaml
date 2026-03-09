@@ -3,7 +3,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: {{ include "fastapi-chassis.fullname" . }}
-  namespace: {{ .Values.serviceMonitor.namespace | default .Release.Namespace }}
+  namespace: {{ .Values.serviceMonitor.namespace | default (include "fastapi-chassis.namespace" .) }}
   labels:
     {{- include "fastapi-chassis.labels" . | nindent 4 }}
     {{- with .Values.serviceMonitor.labels }}
@@ -15,7 +15,7 @@ spec:
       {{- include "fastapi-chassis.selectorLabels" . | nindent 6 }}
   namespaceSelector:
     matchNames:
-      - {{ .Release.Namespace }}
+      - {{ include "fastapi-chassis.namespace" . }}
   endpoints:
     - port: http
       path: /metrics

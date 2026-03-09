@@ -5,6 +5,7 @@
 replicaCount: 1
 
 image:
+  registry: ""
   repository: fastapi-chassis
   pullPolicy: Never
   tag: test

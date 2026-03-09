@@ -6,14 +6,14 @@ FastAPI Chassis has been deployed.
   http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}
 {{- end }}
 {{- else if contains "NodePort" (.Values.service.type | default "ClusterIP") }}
-  export NODE_PORT=$(kubectl get -n {{ .Release.Namespace }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "fastapi-chassis.fullname" . }})
+  export NODE_PORT=$(kubectl get -n {{ include "fastapi-chassis.namespace" . }} -o jsonpath="{.spec.ports[0].nodePort}" services {{ include "fastapi-chassis.fullname" . }})
   export NODE_IP=$(kubectl get nodes -o jsonpath="{.items[0].status.addresses[0].address}")
   echo http://$NODE_IP:$NODE_PORT
 {{- else if contains "LoadBalancer" (.Values.service.type | default "ClusterIP") }}
-  export SERVICE_IP=$(kubectl get svc -n {{ .Release.Namespace }} {{ include "fastapi-chassis.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  export SERVICE_IP=$(kubectl get svc -n {{ include "fastapi-chassis.namespace" . }} {{ include "fastapi-chassis.fullname" . }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
   echo http://$SERVICE_IP:{{ .Values.service.port | default 80 }}
 {{- else }}
-  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "fastapi-chassis.fullname" . }} 8000:{{ .Values.service.port | default 80 }}
+  kubectl port-forward -n {{ include "fastapi-chassis.namespace" . }} svc/{{ include "fastapi-chassis.fullname" . }} 8000:{{ .Values.service.port | default 80 }}
   echo http://localhost:8000
 {{- end }}
 
@@ -34,4 +34,37 @@ FastAPI Chassis has been deployed.
 {{- if .Values.migrations.enabled }}
 
 Database migrations run automatically via pre-install/pre-upgrade hook.
+{{- end }}
+
+{{- /* ===== Production Warnings (Bitnami pattern #6) ===== */}}
+
+{{- $warnings := list -}}
+
+{{- if or (not .Values.image.tag) (eq (.Values.image.tag | toString) "latest") }}
+{{- $warnings = append $warnings "WARNING: Using a rolling image tag (empty or 'latest'). Pin a specific tag or digest for production." -}}
+{{- end }}
+
+{{- if and (not .Values.resources) (not .Values.resourcePreset) }}
+{{- $warnings = append $warnings "WARNING: No resource requests/limits configured. Set resources or resourcePreset for production." -}}
+{{- end }}
+
+{{- if .Values.app.debug }}
+{{- $warnings = append $warnings "WARNING: Debug mode is enabled (app.debug=true). Disable for production." -}}
+{{- end }}
+
+{{- if or .Values.app.docsEnabled .Values.app.redocEnabled .Values.app.openapiEnabled }}
+{{- $warnings = append $warnings "WARNING: API documentation endpoints are enabled. Disable for production (docsEnabled, redocEnabled, openapiEnabled)." -}}
+{{- end }}
+
+{{- if and (not .Values.autoscaling.enabled) (le (int .Values.replicaCount) 1) }}
+{{- $warnings = append $warnings "WARNING: Running a single replica without autoscaling. Consider replicaCount >= 2 or enable HPA for high availability." -}}
+{{- end }}
+
+{{- if $warnings }}
+
+=============== PRODUCTION WARNINGS ===============
+{{- range $warnings }}
+  {{ . }}
+{{- end }}
+====================================================
 {{- end }}

@@ -1,15 +1,34 @@
+# =============================================================================
+# Global Values (for umbrella chart support)
+# =============================================================================
+# These values are shared across all sub-charts in an umbrella deployment.
+global: {}
+  # -- Global image registry override (e.g. for air-gapped environments)
+  # imageRegistry: ""
+  # -- Global storage class override
+  # storageClass: ""
+  # -- Global image pull secrets (merged with local imagePullSecrets)
+  # imagePullSecrets: []
+
+# -- Override the release namespace
+namespaceOverride: ""
+
 # -- Number of replicas (ignored when autoscaling is enabled).
 # For SQLite backend, each replica has its own isolated database.
 # Use replicaCount=1 unless you have a replication layer (e.g. LiteFS).
 replicaCount: 2
 
 image:
-  # -- Container image repository
-  repository: ghcr.io/patrykquantumnomad/fastapi-chassis
+  # -- Container image registry (e.g. ghcr.io, docker.io, gcr.io)
+  registry: ghcr.io
+  # -- Container image repository (without registry prefix)
+  repository: patrykquantumnomad/fastapi-chassis
   # -- Image pull policy
   pullPolicy: IfNotPresent
   # -- Image tag (defaults to Chart.appVersion)
   tag: ""
+  # -- Image digest (takes precedence over tag, e.g. sha256:abcdef...)
+  digest: ""
 
 # -- Image pull secrets for private registries
 imagePullSecrets: []
@@ -101,6 +120,11 @@ database:
     user: fastapi
     # -- Database password (stored in Secret). For production, use existingSecret instead.
     password: ""
+    # -- Use an existing Secret for the Postgres password (Bitnami pattern #2).
+    # When set, the password field above is ignored and the chart's Secret skips this key.
+    existingSecret: ""
+    # -- Key within the existing Secret containing the password
+    existingSecretPasswordKey: ""
 
   sqlite:
     # -- SQLite file path (only used when backend=sqlite)
@@ -122,6 +146,13 @@ database:
   url: ""
   # -- Custom Alembic URL (only used when backend=custom; stored in Secret)
   alembicUrl: ""
+  # -- Use an existing Secret for custom DB URLs (only when backend=custom).
+  # When set, url/alembicUrl fields above are ignored.
+  existingSecret: ""
+  # -- Key within the existing Secret containing the database URL
+  existingSecretUrlKey: ""
+  # -- Key within the existing Secret containing the Alembic URL
+  existingSecretAlembicUrlKey: ""
 
   # -- Connection pool size
   poolSize: 5
@@ -156,10 +187,14 @@ litestream:
   enabled: false
 
   image:
+    # -- Litestream image registry (empty = Docker Hub)
+    registry: ""
     # -- Litestream container image
     repository: litestream/litestream
     # -- Litestream image tag
     tag: "0.3"
+    # -- Litestream image digest (takes precedence over tag)
+    digest: ""
 
   # -- Replica destination configuration.
   # See https://litestream.io/reference/config/ for full options.
@@ -219,10 +254,14 @@ litefs:
   enabled: false
 
   image:
+    # -- LiteFS image registry (empty = Docker Hub)
+    registry: ""
     # -- LiteFS container image
     repository: flyio/litefs
     # -- LiteFS image tag
     tag: "0.5"
+    # -- LiteFS image digest (takes precedence over tag)
+    digest: ""
 
   # -- Built-in HTTP proxy. Routes write requests to the primary node,
   # serves reads from the local replica. The proxy port becomes the
@@ -293,6 +332,13 @@ auth:
   clockSkew: 30
   # -- HTTP timeout for JWKS fetch (seconds)
   httpTimeout: 5
+  # -- Use an existing Secret for JWT credentials (Bitnami pattern #2).
+  # When set, jwtSecret/jwtPublicKey fields above are ignored.
+  existingSecret: ""
+  # -- Key within the existing Secret containing the JWT shared secret
+  existingSecretJwtSecretKey: ""
+  # -- Key within the existing Secret containing the JWT public key PEM
+  existingSecretJwtPublicKeyKey: ""
 
 # =============================================================================
 # Rate Limiting
@@ -340,6 +386,10 @@ redis:
   db: 0
   # -- Redis password (stored in Secret)
   password: ""
+  # -- Use an existing Secret for the Redis password (Bitnami pattern #2).
+  existingSecret: ""
+  # -- Key within the existing Secret containing the Redis password
+  existingSecretPasswordKey: ""
 
 # =============================================================================
 # Prometheus Metrics
@@ -473,7 +523,14 @@ resources:
     cpu: 100m
     memory: 256Mi
   limits:
+    cpu: 500m
     memory: 512Mi
+
+# -- Resource preset for dev/test (alternative to explicit resources).
+# Valid values: nano, micro, small, medium, large, xlarge, 2xlarge.
+# NOTE: Presets are for dev/test only. Set explicit resources for production.
+# Explicit resources above take precedence over presets.
+resourcePreset: ""
 
 # =============================================================================
 # Autoscaling (HPA)
@@ -531,7 +588,10 @@ serviceMonitor:
 # Network Policy
 # =============================================================================
 networkPolicy:
-  # -- Enable NetworkPolicy
+  # -- Enable NetworkPolicy.
+  # PRODUCTION: Set to true and configure ingressFrom to restrict traffic
+  # to your ingress controller namespace. Without ingressFrom rules,
+  # enabling this blocks all inbound traffic to the service.
   enabled: false
   # -- Ingress source rules (e.g. allow from ingress controller namespace)
   ingressFrom: []
@@ -583,8 +643,13 @@ nodeSelector: {}
 # -- Tolerations
 tolerations: []
 
-# -- Pod affinity/anti-affinity rules
+# -- Pod affinity/anti-affinity rules (explicit, takes precedence over podAntiAffinityType)
 affinity: {}
+
+# -- Simplified pod anti-affinity (Bitnami pattern #10).
+# Set to "soft" (preferred) or "hard" (required) for automatic pod anti-affinity
+# based on hostname. Ignored when affinity is set explicitly.
+podAntiAffinityType: ""
 
 # -- Topology spread constraints for zone-aware scheduling
 topologySpreadConstraints: []
@@ -602,3 +667,11 @@ topologySpreadConstraints: []
 extraVolumes: []
 # -- Extra volume mounts for the container
 extraVolumeMounts: []
+
+# =============================================================================
+# Advanced / Overrides
+# =============================================================================
+
+# -- Override the detected Kubernetes version (for CI/testing).
+# Affects apiVersion selection for Ingress, HPA, PDB, etc.
+kubeVersionOverride: ""

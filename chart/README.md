@@ -1,6 +1,6 @@
 # fastapi-chassis
 
-![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.0.0](https://img.shields.io/badge/AppVersion-1.0.0-informational?style=flat-square)
+![Version: 1.0.0](https://img.shields.io/badge/Version-1.0.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 1.0.0](https://img.shields.io/badge/AppVersion-1.0.0-informational?style=flat-square)
 
 Production-ready Helm chart for deploying FastAPI Chassis applications
 
@@ -16,7 +16,7 @@ Production-ready Helm chart for deploying FastAPI Chassis applications
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| affinity | object | `{}` | Pod affinity/anti-affinity rules |
+| affinity | object | `{}` | Pod affinity/anti-affinity rules (explicit, takes precedence over podAntiAffinityType) |
 | app.debug | bool | `false` | Enable debug mode (never enable in production) |
 | app.docsEnabled | bool | `false` | Expose Swagger UI (disable in production) |
 | app.forwardedAllowIps | string | `"*"` | Trusted proxy IPs for X-Forwarded-* headers. Use "*" when behind a k8s ingress controller. |
@@ -34,6 +34,9 @@ Production-ready Helm chart for deploying FastAPI Chassis applications
 | app.workers | int | `1` | Number of uvicorn workers per pod |
 | auth.clockSkew | int | `30` | Clock skew tolerance (seconds) |
 | auth.enabled | bool | `false` | Enable JWT authentication |
+| auth.existingSecret | string | `""` | Use an existing Secret for JWT credentials (Bitnami pattern #2). When set, jwtSecret/jwtPublicKey fields above are ignored. |
+| auth.existingSecretJwtPublicKeyKey | string | `""` | Key within the existing Secret containing the JWT public key PEM |
+| auth.existingSecretJwtSecretKey | string | `""` | Key within the existing Secret containing the JWT shared secret |
 | auth.httpTimeout | int | `5` | HTTP timeout for JWKS fetch (seconds) |
 | auth.jwksCacheTtl | int | `300` | JWKS cache TTL (seconds) |
 | auth.jwksUrl | string | `""` | JWKS URL for key rotation (must be https://) |
@@ -64,10 +67,15 @@ Production-ready Helm chart for deploying FastAPI Chassis applications
 | database.alembicUrl | string | `""` | Custom Alembic URL (only used when backend=custom; stored in Secret) |
 | database.backend | string | `"postgres"` | Database backend: postgres, sqlite, or custom. SQLite deploys as a StatefulSet with persistent local storage. Postgres/custom deploy as a stateless Deployment. |
 | database.connectTimeout | int | `5` | Connection timeout (seconds) |
+| database.existingSecret | string | `""` | Use an existing Secret for custom DB URLs (only when backend=custom). When set, url/alembicUrl fields above are ignored. |
+| database.existingSecretAlembicUrlKey | string | `""` | Key within the existing Secret containing the Alembic URL |
+| database.existingSecretUrlKey | string | `""` | Key within the existing Secret containing the database URL |
 | database.healthTimeout | int | `2` | Health check timeout (seconds) |
 | database.maxOverflow | int | `10` | Max overflow connections |
 | database.poolPrePing | bool | `true` | Ping connections before use |
 | database.poolSize | int | `5` | Connection pool size |
+| database.postgres.existingSecret | string | `""` | Use an existing Secret for the Postgres password (Bitnami pattern #2). When set, the password field above is ignored and the chart's Secret skips this key. |
+| database.postgres.existingSecretPasswordKey | string | `""` | Key within the existing Secret containing the password |
 | database.postgres.host | string | `"postgres"` | Postgres host |
 | database.postgres.name | string | `"fastapi_chassis"` | Database name |
 | database.postgres.password | string | `""` | Database password (stored in Secret). For production, use existingSecret instead. |
@@ -90,8 +98,11 @@ Production-ready Helm chart for deploying FastAPI Chassis applications
 | extraVolumeMounts | list | `[]` | Extra volume mounts for the container |
 | extraVolumes | list | `[]` | Extra volumes to add to the pod |
 | fullnameOverride | string | `""` | Override the full release name |
+| global | object | `{}` |  |
+| image.digest | string | `""` | Image digest (takes precedence over tag, e.g. sha256:abcdef...) |
 | image.pullPolicy | string | `"IfNotPresent"` | Image pull policy |
-| image.repository | string | `"ghcr.io/patrykquantumnomad/fastapi-chassis"` | Container image repository |
+| image.registry | string | `"ghcr.io"` | Container image registry (e.g. ghcr.io, docker.io, gcr.io) |
+| image.repository | string | `"patrykquantumnomad/fastapi-chassis"` | Container image repository (without registry prefix) |
 | image.tag | string | `""` | Image tag (defaults to Chart.appVersion) |
 | imagePullSecrets | list | `[]` | Image pull secrets for private registries |
 | ingress.annotations | object | `{}` | Ingress annotations |
@@ -99,7 +110,10 @@ Production-ready Helm chart for deploying FastAPI Chassis applications
 | ingress.enabled | bool | `false` | Enable Ingress |
 | ingress.hosts | list | `[]` | Ingress host rules |
 | ingress.tls | list | `[]` | Ingress TLS configuration |
+| kubeVersionOverride | string | `""` | Override the detected Kubernetes version (for CI/testing). Affects apiVersion selection for Ingress, HPA, PDB, etc. |
 | litefs.enabled | bool | `false` | Enable LiteFS distributed replication |
+| litefs.image.digest | string | `""` | LiteFS image digest (takes precedence over tag) |
+| litefs.image.registry | string | `""` | LiteFS image registry (empty = Docker Hub) |
 | litefs.image.repository | string | `"flyio/litefs"` | LiteFS container image |
 | litefs.image.tag | string | `"0.5"` | LiteFS image tag |
 | litefs.lease | object | `{"consul":{"hostname":"","key":"","ttl":""},"type":"static"}` | Lease configuration for primary election. |
@@ -115,6 +129,8 @@ Production-ready Helm chart for deploying FastAPI Chassis applications
 | litestream.enabled | bool | `false` | Enable Litestream sidecar for SQLite backup/restore |
 | litestream.env | list | `[]` | Extra environment variables for the Litestream containers |
 | litestream.existingSecret | string | `""` | Name of an existing Secret containing Litestream credentials (e.g. LITESTREAM_ACCESS_KEY_ID, LITESTREAM_SECRET_ACCESS_KEY). |
+| litestream.image.digest | string | `""` | Litestream image digest (takes precedence over tag) |
+| litestream.image.registry | string | `""` | Litestream image registry (empty = Docker Hub) |
 | litestream.image.repository | string | `"litestream/litestream"` | Litestream container image |
 | litestream.image.tag | string | `"0.3"` | Litestream image tag |
 | litestream.replica | object | `{"bucket":"","endpoint":"","path":"","region":"","retentionDuration":"","syncInterval":"","type":"s3","url":""}` | Replica destination configuration. See https://litestream.io/reference/config/ for full options. |
@@ -133,8 +149,9 @@ Production-ready Helm chart for deploying FastAPI Chassis applications
 | migrations.backoffLimit | int | `3` | Maximum retries |
 | migrations.enabled | bool | `false` | Run migrations as a pre-install/pre-upgrade Helm hook Job |
 | nameOverride | string | `""` | Override the chart name |
+| namespaceOverride | string | `""` | Override the release namespace |
 | networkPolicy.databaseCIDR | string | `""` | Database CIDR for egress (leave empty to allow any destination) |
-| networkPolicy.enabled | bool | `false` | Enable NetworkPolicy |
+| networkPolicy.enabled | bool | `false` | Enable NetworkPolicy. PRODUCTION: Set to true and configure ingressFrom to restrict traffic to your ingress controller namespace. Without ingressFrom rules, enabling this blocks all inbound traffic to the service. |
 | networkPolicy.extraEgress | list | `[]` | Extra egress rules |
 | networkPolicy.ingressFrom | list | `[]` | Ingress source rules (e.g. allow from ingress controller namespace) |
 | networkPolicy.redisCIDR | string | `""` | Redis CIDR for egress |
@@ -143,6 +160,7 @@ Production-ready Helm chart for deploying FastAPI Chassis applications
 | persistence.size | string | `"10Gi"` | Volume size |
 | persistence.storageClass | string | `""` | Storage class for the SQLite data volume. Use high-performance block storage (e.g. gp3, pd-ssd, local-path). Leave empty for cluster default. |
 | podAnnotations | object | `{}` | Annotations on all pods |
+| podAntiAffinityType | string | `""` | Simplified pod anti-affinity (Bitnami pattern #10). Set to "soft" (preferred) or "hard" (required) for automatic pod anti-affinity based on hostname. Ignored when affinity is set explicitly. |
 | podDisruptionBudget.enabled | bool | `true` | Enable PDB (recommended when replicaCount >= 2) |
 | podDisruptionBudget.maxUnavailable | string | `""` | Maximum unavailable pods |
 | podDisruptionBudget.minAvailable | int | `1` | Minimum available pods (takes precedence over maxUnavailable) |
@@ -166,10 +184,14 @@ Production-ready Helm chart for deploying FastAPI Chassis applications
 | rateLimit.trustProxyHeaders | bool | `true` | Trust proxy headers for client IP (set true behind ingress) |
 | rateLimit.windowSeconds | int | `60` | Window duration (seconds) |
 | redis.db | int | `0` | Redis DB index |
+| redis.existingSecret | string | `""` | Use an existing Secret for the Redis password (Bitnami pattern #2). |
+| redis.existingSecretPasswordKey | string | `""` | Key within the existing Secret containing the Redis password |
 | redis.host | string | `"redis"` | Redis host |
 | redis.password | string | `""` | Redis password (stored in Secret) |
 | redis.port | int | `6379` | Redis port |
 | replicaCount | int | `2` | Number of replicas (ignored when autoscaling is enabled). For SQLite backend, each replica has its own isolated database. Use replicaCount=1 unless you have a replication layer (e.g. LiteFS). |
+| resourcePreset | string | `""` | Resource preset for dev/test (alternative to explicit resources). Valid values: nano, micro, small, medium, large, xlarge, 2xlarge. NOTE: Presets are for dev/test only. Set explicit resources for production. Explicit resources above take precedence over presets. |
+| resources.limits.cpu | string | `"500m"` |  |
 | resources.limits.memory | string | `"512Mi"` |  |
 | resources.requests.cpu | string | `"100m"` |  |
 | resources.requests.memory | string | `"256Mi"` |  |

@@ -66,8 +66,14 @@ curl -s "$APP_AUTH_JWKS_URL"
 1. Verify the JWKS URL is reachable from the application container
 2. Check DNS resolution and network policies
 3. If using mTLS, ensure certificates are valid
-4. The service uses stale-while-revalidate — existing tokens continue working until the cache TTL expires
-5. Fix connectivity, then restart the service to force a fresh JWKS fetch on warm-up
+4. The service uses stale-while-revalidate — existing tokens continue working
+   for up to `APP_AUTH_JWKS_MAX_STALE_SECONDS` (default 3600s) after the last
+   successful refresh. Once that window expires, the stale cache is discarded
+   and all JWKS-dependent token validation fails. Set this to `0` to never
+   accept stale keys (fail immediately on refresh failure)
+5. If `APP_AUTH_REQUIRE_WARMUP=true`, readiness will fail immediately on JWKS
+   issues and the app will not start if JWKS is unreachable at boot
+6. Fix connectivity, then restart the service to force a fresh JWKS fetch on warm-up
 
 ---
 

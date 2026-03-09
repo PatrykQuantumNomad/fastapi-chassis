@@ -134,3 +134,33 @@ class TestLifespanManager:
 
         async with manager.lifespan(app):
             assert app.state.http_client.timeout.connect == 15
+
+    @pytest.mark.asyncio
+    async def test_lifespan_aborts_when_auth_require_warmup_and_jwks_fails(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        settings = make_settings(
+            auth_enabled=True,
+            auth_jwt_algorithms=["RS256"],
+            auth_jwks_url="https://issuer.example.com/.well-known/jwks.json",
+            auth_jwt_audience="fastapi-chassis",
+            auth_jwt_issuer="https://issuer.example.com/",
+            auth_require_warmup=True,
+            metrics_enabled=False,
+        )
+        logger = logging.getLogger("test-lifespan-require-warmup")
+        logger.setLevel(logging.INFO)
+        manager = LifespanManager(settings, logger)
+        app = FastAPI()
+        auth_service = Mock()
+        auth_service.warm_up = AsyncMock(side_effect=RuntimeError("jwks down"))
+
+        with (
+            patch("app.lifespan.JWTAuthService", return_value=auth_service),
+            caplog.at_level(logging.ERROR, logger="test-lifespan-require-warmup"),
+            pytest.raises(RuntimeError, match="jwks down"),
+        ):
+            async with manager.lifespan(app):
+                pass  # should not reach here
+
+        assert any("aborting startup" in record.message for record in caplog.records)

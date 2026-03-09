@@ -3,7 +3,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ include "fastapi-chassis.fullname" . }}-litefs
-  namespace: {{ .Release.Namespace }}
+  namespace: {{ include "fastapi-chassis.namespace" . }}
   labels:
     {{- include "fastapi-chassis.labels" . | nindent 4 }}
 data:
@@ -30,10 +30,10 @@ data:
       type: {{ .Values.litefs.lease.type | default "static" | quote }}
       {{- if eq (.Values.litefs.lease.type | default "static") "static" }}
       hostname: "{{ include "fastapi-chassis.fullname" . }}-0"
-      advertise-url: "http://{{ include "fastapi-chassis.fullname" . }}-0.{{ include "fastapi-chassis.headlessServiceName" . }}.{{ .Release.Namespace }}.svc.cluster.local:20202"
+      advertise-url: "http://{{ include "fastapi-chassis.fullname" . }}-0.{{ include "fastapi-chassis.headlessServiceName" . }}.{{ include "fastapi-chassis.namespace" . }}.svc.cluster.local:20202"
       {{- else if eq .Values.litefs.lease.type "consul" }}
       hostname: {{ .Values.litefs.lease.consul.hostname | quote }}
-      advertise-url: "http://${HOSTNAME}.{{ include "fastapi-chassis.headlessServiceName" . }}.{{ .Release.Namespace }}.svc.cluster.local:20202"
+      advertise-url: "http://${HOSTNAME}.{{ include "fastapi-chassis.headlessServiceName" . }}.{{ include "fastapi-chassis.namespace" . }}.svc.cluster.local:20202"
       {{- if .Values.litefs.lease.consul.key }}
       key: {{ .Values.litefs.lease.consul.key | quote }}
       {{- end }}
