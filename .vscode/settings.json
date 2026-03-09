@@ -145,6 +145,7 @@
     "Instrumentor",
     "isort",
     "levelname",
+    "Litestream",
     "livez",
     "monkeypatching",
     "mypy",
@@ -164,12 +165,14 @@
     "readyz",
     "redoc",
     "referer",
+    "Retag",
     "spoofable",
     "sqlalchemy",
     "Starlette",
     "testpaths",
     "tini",
     "tmpfs",
+    "usermod",
     "uvicorn",
     "virtualenv"
   ]

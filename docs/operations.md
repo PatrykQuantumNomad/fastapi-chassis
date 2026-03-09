@@ -58,6 +58,10 @@ when the host should deploy the published image through `docker compose`.
 The checked-in deployment compose file is intentionally app-only; it does not
 automatically provision Postgres or Redis for production.
 
+See [`docs/vm-deployment.md`](vm-deployment.md) for the full VM deployment
+guide covering both paths, GitHub Actions configuration, rollback behavior,
+reverse proxy setup, and production checklist.
+
 ### Kubernetes (Helm)
 
 Use the included Helm chart in `chart/` when deploying to Kubernetes:
